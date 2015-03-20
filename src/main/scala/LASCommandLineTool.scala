@@ -17,6 +17,7 @@ import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import fi.seco.lexical.hfst.HFSTLexicalAnalysisService.WordToResults
 import play.api.libs.json.Writes
+import java.util.Collections
 
 object LASCommandLineTool {
 
@@ -27,12 +28,12 @@ object LASCommandLineTool {
 
   object Action extends Enumeration {
     type Action = Value
-    val Lemmatize, Analyze, Detect = Value
+    val Inflect, Lemmatize, Analyze, Detect = Value
   }
 
   implicit val actionRead: scopt.Read[Action.Value] = scopt.Read.reads(Action withName _)
 
-  case class Config(action: Action.Action = null, locale: Seq[String] = Seq(), files: Seq[String] = Seq())
+  case class Config(action: Action.Action = null, locale: Seq[String] = Seq(), forms: Seq[String] = Seq(), files: Seq[String] = Seq())
 
   def writeFile(file: String, text: String): Unit = {
     val writer = new PrintWriter(new File(file))
@@ -45,21 +46,27 @@ object LASCommandLineTool {
       head("las", "1.0")
       cmd("lemmatize") action { (_, c) =>
         c.copy(action = Action.Lemmatize)
-      } text (s"lemmatize (locales: ${compoundlas.getSupportedBaseformLocales.mkString(", ")})")
+      } text (s"(locales: ${compoundlas.getSupportedBaseformLocales.mkString(", ")})")
       cmd("analyze") action { (_, c) =>
         c.copy(action = Action.Analyze)
-      } text (s"analyze (locales: ${combinedlas.getSupportedAnalyzeLocales.mkString(", ")})")
+      } text (s"(locales: ${combinedlas.getSupportedAnalyzeLocales.mkString(", ")})")
+      cmd("inflect") action { (_, c) =>
+        c.copy(action = Action.Inflect)
+      } text (s"(locales: ${combinedlas.getSupportedInflectionLocales.mkString(", ")})")
       cmd("identify") action { (_, c) =>
         c.copy(action = Action.Detect)
       } text (s"identify language (locales: ${(LanguageRecognizer.getAvailableLanguages ++ LanguageDetector.supportedLanguages ++ compoundlas.getSupportedBaseformLocales).toSet.mkString(", ")})")
       opt[Seq[String]]("locale") optional () action { (x, c) =>
         c.copy(locale = x)
       } text ("possible locales")
+      opt[Seq[String]]("forms") optional () action { (x, c) =>
+        c.copy(forms = x)
+      } text ("inclection forms for inflect/analyze")
       arg[String]("<file>...") unbounded () optional () action { (x, c) =>
         c.copy(files = c.files :+ x)
       } text ("files to process (stdin if not given)")
       help("help") text("prints this usage text")
-      checkConfig { c => if (c.action==null) failure("specify at least an action (lemmatize, analyze or identify)") else success }
+      checkConfig { c => if (c.action==null) failure("specify at least an action (lemmatize, analyze, inflect or identify)") else success }
     }
     // parser.parse returns Option[C]
     parser.parse(args, Config()) match {
@@ -80,12 +87,24 @@ object LASCommandLineTool {
           case Action.Analyze => if (!config.files.isEmpty) {
             for (
               file <- config.files;
-              text = Source.fromFile(file).mkString; out = analyze(text, config.locale); if out.isDefined
+              text = Source.fromFile(file).mkString; out = analyze(text, config.locale,config.forms); if out.isDefined
             ) writeFile(file + ".analysis", out.get);
           } else {
             var text = StdIn.readLine()
             while (text != null) {
-              println(analyze(text, config.locale).getOrElse("?"));
+              println(analyze(text, config.locale,config.forms).getOrElse("?"));
+              text = StdIn.readLine()
+            }
+          }
+          case Action.Inflect => if (!config.files.isEmpty) {
+            for (
+              file <- config.files;
+              text = Source.fromFile(file).mkString; out = inflect(text, config.locale,config.forms); if out.isDefined
+            ) writeFile(file + ".inflected", out.get);
+          } else {
+            var text = StdIn.readLine()
+            while (text != null) {
+              println(analyze(text, config.locale,config.forms).getOrElse("?"));
               text = StdIn.readLine()
             }
           }
@@ -108,7 +127,7 @@ object LASCommandLineTool {
   }
 
   def lemmatize(text: String, locales: Seq[String]): Option[String] = {
-    getBestLang(text, if (locales.isEmpty) compoundlas.getSupportedBaseformLocales.toSeq.map(_.toString) else locales) match {
+    (if (locales.length==1) Some(locales(0)) else getBestLang(text, if (locales.isEmpty) compoundlas.getSupportedBaseformLocales.toSeq.map(_.toString) else locales)) match {
       case Some(lang) => 
         val baseform = compoundlas.baseform(text, new Locale(lang)) 
         if (locales.isEmpty) Some(Json.toJson(Map("locale" -> lang, "baseform" -> baseform)).toString())
@@ -145,12 +164,22 @@ object LASCommandLineTool {
     }
   }
 
-  def analyze(text: String, locales: Seq[String]): Option[String] = {
-    getBestLang(text, if (locales.isEmpty) combinedlas.getSupportedAnalyzeLocales.toSeq.map(_.toString) else locales) match {
+  def analyze(text: String, locales: Seq[String],forms:Seq[String]): Option[String] = {
+    (if (locales.length==1) Some(locales(0)) else getBestLang(text, if (locales.isEmpty) combinedlas.getSupportedAnalyzeLocales.toSeq.map(_.toString) else locales)) match {
       case Some(lang) => 
-        val analysis = Json.toJson(combinedlas.analyze(text, new Locale(lang)).toList)
+        val analysis = Json.toJson(combinedlas.analyze(text, new Locale(lang),forms).toList)
         if (locales.isEmpty) Some(Json.toJson(Map("locale" -> lang, "analysis" -> analysis).toString()).toString())
         else Some(analysis.toString())
+      case None       => None
+    }
+  }
+
+  def inflect(text: String, locales: Seq[String],forms:Seq[String]): Option[String] = {
+    (if (locales.length==1) Some(locales(0)) else getBestLang(text, if (locales.isEmpty) compoundlas.getSupportedInflectionLocales.toSeq.map(_.toString) else locales)) match {
+      case Some(lang) => 
+        val baseform = compoundlas.inflect(text, forms, true, new Locale(lang)) 
+        if (locales.isEmpty) Some(Json.toJson(Map("locale" -> lang, "inflection" -> baseform)).toString())
+        else Some(baseform)
       case None       => None
     }
   }
@@ -163,7 +192,7 @@ object LASCommandLineTool {
       val ldResult = detector.getProbabilities().map(l => Map(l.lang -> l.prob))
       val hfstResultTmp = hfstlas.getSupportedAnalyzeLocales.map(lang =>
         (lang.toString(),
-          hfstlas.analyze(text, lang).foldRight((0, 0)) { (ar, count) =>
+          hfstlas.analyze(text, lang,Collections.emptyList[String]).foldRight((0, 0)) { (ar, count) =>
             if ((ar.getAnalysis.get(0).getParts().get(0).getTags.isEmpty || ar.getAnalysis.get(0).getParts().get(0).getTags.containsKey("PUNCT")) && ar.getAnalysis.get(0).getGlobalTags.isEmpty)
               (count._1, count._2 + 1)
             else (count._1 + 1, count._2 + 1)
@@ -179,7 +208,7 @@ object LASCommandLineTool {
       val ldResult = detector.getProbabilities().map(l => Map(l.lang -> l.prob))
       val hfstResultTmp = locales.map(new Locale(_)).intersect(hfstlas.getSupportedAnalyzeLocales.toSeq).map(lang =>
         (lang.toString(),
-          hfstlas.analyze(text, lang).foldRight((0, 0)) { (ar, count) =>
+          hfstlas.analyze(text, lang,Collections.emptyList[String]).foldRight((0, 0)) { (ar, count) =>
             if ((ar.getAnalysis.get(0).getParts().get(0).getTags.isEmpty || ar.getAnalysis.get(0).getParts().get(0).getTags.containsKey("PUNCT")) && ar.getAnalysis.get(0).getGlobalTags.isEmpty)
               (count._1, count._2 + 1)
             else (count._1 + 1, count._2 + 1)
@@ -199,7 +228,7 @@ object LASCommandLineTool {
       val ldResult = detector.getProbabilities().map(l => Map(l.lang -> l.prob))
       val hfstResultTmp = locales.map(new Locale(_)).intersect(hfstlas.getSupportedAnalyzeLocales.toSeq).map(lang =>
         (lang.toString(),
-          hfstlas.analyze(text, lang).foldRight((0, 0)) { (ar, count) =>
+          hfstlas.analyze(text, lang,Collections.emptyList[String]).foldRight((0, 0)) { (ar, count) =>
             if ((ar.getAnalysis.get(0).getParts().get(0).getTags.isEmpty || ar.getAnalysis.get(0).getParts().get(0).getTags.containsKey("PUNCT")) && ar.getAnalysis.get(0).getGlobalTags.isEmpty)
               (count._1, count._2 + 1)
             else (count._1 + 1, count._2 + 1)
@@ -218,7 +247,7 @@ object LASCommandLineTool {
       val ldResult = detector.getProbabilities().map(l => Map(l.lang -> l.prob))
       val hfstResultTmp = hfstlas.getSupportedAnalyzeLocales.map(lang =>
         (lang.toString(),
-          hfstlas.analyze(text, lang).foldRight((0, 0)) { (ar, count) =>
+          hfstlas.analyze(text, lang,Collections.emptyList[String]).foldRight((0, 0)) { (ar, count) =>
             if ((ar.getAnalysis.get(0).getParts().get(0).getTags.isEmpty || ar.getAnalysis.get(0).getParts().get(0).getTags.containsKey("PUNCT")) && ar.getAnalysis.get(0).getGlobalTags.isEmpty)
               (count._1, count._2 + 1)
             else (count._1 + 1, count._2 + 1)
