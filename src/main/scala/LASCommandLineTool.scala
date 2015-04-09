@@ -191,12 +191,7 @@ object LASCommandLineTool {
       detector.append(text)
       val ldResult = detector.getProbabilities().map(l => Map(l.lang -> l.prob))
       val hfstResultTmp = hfstlas.getSupportedAnalyzeLocales.map(lang =>
-        (lang.toString(),
-          hfstlas.analyze(text, lang,Collections.emptyList[String]).foldRight((0, 0)) { (ar, count) =>
-            if ((ar.getAnalysis.get(0).getParts().get(0).getTags.isEmpty || ar.getAnalysis.get(0).getParts().get(0).getTags.containsKey("PUNCT")) && ar.getAnalysis.get(0).getGlobalTags.isEmpty)
-              (count._1, count._2 + 1)
-            else (count._1 + 1, count._2 + 1)
-          })).filter(_._2._1 != 0).toSeq.view.sortBy(_._2._1).reverse.map(p => (p._1, p._2._1.asInstanceOf[Double] / p._2._2))
+            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2!=0.0).toSeq.sortBy(_._2).reverse
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
       val hfstResult = hfstResultTmp.map(p => Map(p._1 -> p._2 / tc))
       Try(Some((ldResult ++ hfstResult ++ lrResult).groupBy(_.keysIterator.next).mapValues(_.foldRight(0.0) { (p, r) => r + p.valuesIterator.next } / 3.0).maxBy(_._2)._1)).getOrElse(None)
@@ -207,12 +202,7 @@ object LASCommandLineTool {
       detector.append(text)
       val ldResult = detector.getProbabilities().map(l => Map(l.lang -> l.prob))
       val hfstResultTmp = locales.map(new Locale(_)).intersect(hfstlas.getSupportedAnalyzeLocales.toSeq).map(lang =>
-        (lang.toString(),
-          hfstlas.analyze(text, lang,Collections.emptyList[String]).foldRight((0, 0)) { (ar, count) =>
-            if ((ar.getAnalysis.get(0).getParts().get(0).getTags.isEmpty || ar.getAnalysis.get(0).getParts().get(0).getTags.containsKey("PUNCT")) && ar.getAnalysis.get(0).getGlobalTags.isEmpty)
-              (count._1, count._2 + 1)
-            else (count._1 + 1, count._2 + 1)
-          })).filter(_._2._1 != 0).toSeq.view.sortBy(_._2._1).reverse.map(p => (p._1, p._2._1.asInstanceOf[Double] / p._2._2))
+            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2!=0.0).toSeq.sortBy(_._2).reverse
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
       val hfstResult = hfstResultTmp.map(p => Map(p._1 -> p._2 / tc))
       Try(Some((ldResult ++ hfstResult ++ lrResult).groupBy(_.keysIterator.next).mapValues(_.foldRight(0.0) { (p, r) => r + p.valuesIterator.next } / 3.0).maxBy(_._2)._1)).getOrElse(None)
@@ -227,12 +217,7 @@ object LASCommandLineTool {
       detector.append(text)
       val ldResult = detector.getProbabilities().map(l => Map(l.lang -> l.prob))
       val hfstResultTmp = locales.map(new Locale(_)).intersect(hfstlas.getSupportedAnalyzeLocales.toSeq).map(lang =>
-        (lang.toString(),
-          hfstlas.analyze(text, lang,Collections.emptyList[String]).foldRight((0, 0)) { (ar, count) =>
-            if ((ar.getAnalysis.get(0).getParts().get(0).getTags.isEmpty || ar.getAnalysis.get(0).getParts().get(0).getTags.containsKey("PUNCT")) && ar.getAnalysis.get(0).getGlobalTags.isEmpty)
-              (count._1, count._2 + 1)
-            else (count._1 + 1, count._2 + 1)
-          })).filter(_._2._1 != 0).toSeq.view.sortBy(_._2._1).reverse.map(p => (p._1, p._2._1.asInstanceOf[Double] / p._2._2))
+            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2!=0.0).toSeq.sortBy(_._2).reverse
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
       val hfstResult = hfstResultTmp.map(p => Map(p._1 -> p._2 / tc))
       val bestGuess = Try(Some((ldResult ++ hfstResult ++ lrResult).groupBy(_.keysIterator.next).mapValues(_.foldRight(0.0) { (p, r) => r + p.valuesIterator.next } / 3.0).maxBy(_._2))).getOrElse(None)
@@ -246,12 +231,7 @@ object LASCommandLineTool {
       detector.append(text)
       val ldResult = detector.getProbabilities().map(l => Map(l.lang -> l.prob))
       val hfstResultTmp = hfstlas.getSupportedAnalyzeLocales.map(lang =>
-        (lang.toString(),
-          hfstlas.analyze(text, lang,Collections.emptyList[String]).foldRight((0, 0)) { (ar, count) =>
-            if ((ar.getAnalysis.get(0).getParts().get(0).getTags.isEmpty || ar.getAnalysis.get(0).getParts().get(0).getTags.containsKey("PUNCT")) && ar.getAnalysis.get(0).getGlobalTags.isEmpty)
-              (count._1, count._2 + 1)
-            else (count._1 + 1, count._2 + 1)
-          })).filter(_._2._1 != 0).toSeq.view.sortBy(_._2._1).reverse.map(p => (p._1, p._2._1.asInstanceOf[Double] / p._2._2))
+            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2!=0.0).toSeq.sortBy(_._2).reverse
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
       val hfstResult = hfstResultTmp.map(p => Map(p._1 -> p._2 / tc))
       val bestGuess = Try(Some((ldResult ++ hfstResult ++ lrResult).groupBy(_.keysIterator.next).mapValues(_.foldRight(0.0) { (p, r) => r + p.valuesIterator.next } / 3.0).maxBy(_._2))).getOrElse(None)
