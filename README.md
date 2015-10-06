@@ -18,7 +18,7 @@ identify language (locales: hy, fi, no, lb, hr, ta, ka, ar, fr, is, ug, lv, eu, 
         possible locales
   --forms <value>
         inclection forms for inflect/analyze
-  --segment <value>
+  --segment
         segment compound words?
   <file>...
         files to process (stdin if not given)

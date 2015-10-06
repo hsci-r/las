@@ -63,8 +63,8 @@ object LASCommandLineTool {
       opt[Seq[String]]("forms") optional () action { (x, c) =>
         c.copy(forms = x)
       } text ("inclection forms for inflect/analyze")
-      opt[Boolean]("segment") optional () action { (x, c) =>
-        c.copy(segments = x)
+      opt[Unit]("segment") action { (_, c) =>
+        c.copy(segments = true)
       } text ("segment compound words?")
       arg[String]("<file>...") unbounded () optional () action { (x, c) =>
         c.copy(files = c.files :+ x)
