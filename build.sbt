@@ -34,3 +34,5 @@ assemblyMergeStrategy in assembly := {
 assemblyOption in assembly := (assemblyOption in assembly).value.copy(prependShellScript = Some(Seq("#!/usr/bin/env sh", """exec java -jar "$0" "$@"""")))
 
 assemblyJarName in assembly := "las"
+
+scalacOptions += "-target:jvm-1.7"
