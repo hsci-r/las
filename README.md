@@ -3,7 +3,7 @@ Lexical Analysis Command-Line Tool for lemmatizing, lexical analysis and languag
 
 Program help:
 ```
-las 1.0
+las 1.1.0
 Usage: las [lemmatize|analyze|inflect|identify] [options] [<file>...]
 
 Command: lemmatize
@@ -20,6 +20,10 @@ identify language (locales: hy, fi, no, lb, hr, ta, ka, ar, fr, is, ug, lv, eu, 
         inclection forms for inflect/analyze
   --segment
         segment compound words?
+  --no-guess
+        Don't guess baseforms for unknown words?
+  --no-pretty
+        Don't pretty print analysis json in file output?
   <file>...
         files to process (stdin if not given)
   --help
