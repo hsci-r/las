@@ -34,7 +34,7 @@ object LASCommandLineTool {
 
   implicit val actionRead: scopt.Read[Action.Value] = scopt.Read.reads(Action withName _)
 
-  case class Config(action: Action.Action = null, locale: Seq[String] = Seq(), forms: Seq[String] = Seq(), segments: Boolean = false, files: Seq[String] = Seq())
+  case class Config(action: Action.Action = null, locale: Seq[String] = Seq(), forms: Seq[String] = Seq(), segments: Boolean = false, guess: Boolean = true, pretty: Boolean = true, files: Seq[String] = Seq())
 
   def writeFile(file: String, text: String): Unit = {
     val writer = new PrintWriter(new File(file))
@@ -66,6 +66,12 @@ object LASCommandLineTool {
       opt[Unit]("segment") action { (_, c) =>
         c.copy(segments = true)
       } text ("segment compound words?")
+      opt[Unit]("no-guess") action { (_, c) =>
+        c.copy(guess = false)
+      } text ("Don't guess baseforms for unknown words?")
+      opt[Unit]("no-pretty") action { (_, c) =>
+        c.copy(pretty = true)
+      } text ("Don't pretty print analysis json in file output?")
       arg[String]("<file>...") unbounded () optional () action { (x, c) =>
         c.copy(files = c.files :+ x)
       } text ("files to process (stdin if not given)")
@@ -79,36 +85,36 @@ object LASCommandLineTool {
           case Action.Lemmatize => if (!config.files.isEmpty) {
             for (
               file <- config.files;
-              text = Source.fromFile(file).mkString; out = lemmatize(text, config.locale,config.segments); if out.isDefined
+              text = Source.fromFile(file).mkString; out = lemmatize(text, config.locale,config.segments,config.guess); if out.isDefined
             ) writeFile(file + ".lemmatized", out.get);
           } else {
             var text = StdIn.readLine()
             while (text != null) {
-              println(lemmatize(text, config.locale,config.segments).getOrElse("?"));
+              println(lemmatize(text, config.locale,config.segments,config.guess).getOrElse("?"));
               text = StdIn.readLine()
             }
           }
           case Action.Analyze => if (!config.files.isEmpty) {
             for (
               file <- config.files;
-              text = Source.fromFile(file).mkString; out = analyze(text, config.locale,config.forms,config.segments); if out.isDefined
+              text = Source.fromFile(file).mkString; out = analyze(text, config.locale,config.forms,config.segments,config.guess,config.pretty); if out.isDefined
             ) writeFile(file + ".analysis", out.get);
           } else {
             var text = StdIn.readLine()
             while (text != null) {
-              println(analyze(text, config.locale,config.forms,config.segments).getOrElse("?"));
+              println(analyze(text, config.locale,config.forms,config.segments,config.guess,false).getOrElse("?"));
               text = StdIn.readLine()
             }
           }
           case Action.Inflect => if (!config.files.isEmpty) {
             for (
               file <- config.files;
-              text = Source.fromFile(file).mkString; out = inflect(text, config.locale,config.forms,config.segments); if out.isDefined
+              text = Source.fromFile(file).mkString; out = inflect(text, config.locale,config.forms,config.segments,config.guess); if out.isDefined
             ) writeFile(file + ".inflected", out.get);
           } else {
             var text = StdIn.readLine()
             while (text != null) {
-              println(analyze(text, config.locale,config.forms,config.segments).getOrElse("?"));
+              println(inflect(text, config.locale,config.forms,config.segments,config.guess).getOrElse("?"));
               text = StdIn.readLine()
             }
           }
@@ -130,10 +136,10 @@ object LASCommandLineTool {
     System.exit(0)
   }
 
-  def lemmatize(text: String, locales: Seq[String], segments : Boolean): Option[String] = {
+  def lemmatize(text: String, locales: Seq[String], segments : Boolean, guess: Boolean): Option[String] = {
     (if (locales.length==1) Some(locales(0)) else getBestLang(text, if (locales.isEmpty) compoundlas.getSupportedBaseformLocales.toSeq.map(_.toString) else locales)) match {
       case Some(lang) => 
-        val baseform = compoundlas.baseform(text, new Locale(lang),segments) 
+        val baseform = compoundlas.baseform(text, new Locale(lang),segments,guess) 
         if (locales.isEmpty) Some(Json.toJson(Map("locale" -> lang, "baseform" -> baseform)).toString())
         else Some(baseform)
       case None       => None
@@ -168,20 +174,26 @@ object LASCommandLineTool {
     }
   }
 
-  def analyze(text: String, locales: Seq[String],forms:Seq[String], segments:Boolean): Option[String] = {
+  def analyze(text: String, locales: Seq[String],forms:Seq[String], segments:Boolean, guess:Boolean, pretty:Boolean): Option[String] = {
     (if (locales.length==1) Some(locales(0)) else getBestLang(text, if (locales.isEmpty) combinedlas.getSupportedAnalyzeLocales.toSeq.map(_.toString) else locales)) match {
       case Some(lang) => 
-        val analysis = Json.toJson(combinedlas.analyze(text, new Locale(lang),forms,segments).toList)
-        if (locales.isEmpty) Some(Json.toJson(Map("locale" -> lang, "analysis" -> analysis).toString()).toString())
-        else Some(analysis.toString())
+        val analysis = Json.toJson(combinedlas.analyze(text, new Locale(lang),forms,segments,guess).toList)
+        if (pretty) {
+          if (locales.isEmpty) Some(Json.prettyPrint(Json.toJson(Map("locale" -> Json.toJson(lang), "analysis" -> analysis))))
+          else Some(Json.prettyPrint(analysis))
+        }
+        else {
+          if (locales.isEmpty) Some(Json.toJson(Map("locale" -> Json.toJson(lang), "analysis" -> analysis)).toString())
+          else Some(analysis.toString())
+        }
       case None       => None
     }
   }
 
-  def inflect(text: String, locales: Seq[String],forms:Seq[String],segments:Boolean): Option[String] = {
+  def inflect(text: String, locales: Seq[String],forms:Seq[String],segments:Boolean,guess:Boolean): Option[String] = {
     (if (locales.length==1) Some(locales(0)) else getBestLang(text, if (locales.isEmpty) compoundlas.getSupportedInflectionLocales.toSeq.map(_.toString) else locales)) match {
       case Some(lang) => 
-        val baseform = compoundlas.inflect(text, forms, segments, true, new Locale(lang)) 
+        val baseform = compoundlas.inflect(text, forms, segments, true, guess, new Locale(lang)) 
         if (locales.isEmpty) Some(Json.toJson(Map("locale" -> lang, "inflection" -> baseform)).toString())
         else Some(baseform)
       case None       => None
