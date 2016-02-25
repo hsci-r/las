@@ -34,7 +34,7 @@ object LASCommandLineTool {
 
   implicit val actionRead: scopt.Read[Action.Value] = scopt.Read.reads(Action withName _)
 
-  case class Config(action: Action.Action = null, locale: Seq[String] = Seq(), forms: Seq[String] = Seq(), segments: Boolean = false, guess: Boolean = true, pretty: Boolean = true, files: Seq[String] = Seq())
+  case class Config(action: Action.Action = null, locale: Seq[String] = Seq(), forms: Seq[String] = Seq(), segments: Boolean = false, guess: Boolean = true, segmentGuessed: Boolean = true, pretty: Boolean = true, files: Seq[String] = Seq())
 
   def writeFile(file: String, text: String): Unit = {
     val writer = new PrintWriter(new File(file))
@@ -44,7 +44,7 @@ object LASCommandLineTool {
 
   def main(args: Array[String]) = {
     val parser = new scopt.OptionParser[Config]("las") {
-      head("las", "1.1.0")
+      head("las", "1.2.0")
       cmd("lemmatize") action { (_, c) =>
         c.copy(action = Action.Lemmatize)
       } text (s"(locales: ${compoundlas.getSupportedBaseformLocales.mkString(", ")})")
@@ -69,6 +69,9 @@ object LASCommandLineTool {
       opt[Unit]("no-guess") action { (_, c) =>
         c.copy(guess = false)
       } text ("Don't guess baseforms for unknown words?")
+      opt[Unit]("no-segment-guessed") action { (_, c) =>
+        c.copy(segmentGuessed = false)
+      } text ("Don't guess segmentation information for guessed words (speeds up processing significantly)?")
       opt[Unit]("no-pretty") action { (_, c) =>
         c.copy(pretty = true)
       } text ("Don't pretty print analysis json in file output?")
@@ -97,12 +100,12 @@ object LASCommandLineTool {
           case Action.Analyze => if (!config.files.isEmpty) {
             for (
               file <- config.files;
-              text = Source.fromFile(file).mkString; out = analyze(text, config.locale,config.forms,config.segments,config.guess,config.pretty); if out.isDefined
+              text = Source.fromFile(file).mkString; out = analyze(text, config.locale,config.forms,config.segments,config.guess,config.segmentGuessed,config.pretty); if out.isDefined
             ) writeFile(file + ".analysis", out.get);
           } else {
             var text = StdIn.readLine()
             while (text != null) {
-              println(analyze(text, config.locale,config.forms,config.segments,config.guess,false).getOrElse("?"));
+              println(analyze(text, config.locale,config.forms,config.segments,config.guess,config.segmentGuessed,false).getOrElse("?"));
               text = StdIn.readLine()
             }
           }
@@ -174,10 +177,10 @@ object LASCommandLineTool {
     }
   }
 
-  def analyze(text: String, locales: Seq[String],forms:Seq[String], segments:Boolean, guess:Boolean, pretty:Boolean): Option[String] = {
+  def analyze(text: String, locales: Seq[String],forms:Seq[String], segments:Boolean, guess:Boolean, segmentGuessed:Boolean, pretty:Boolean): Option[String] = {
     (if (locales.length==1) Some(locales(0)) else getBestLang(text, if (locales.isEmpty) combinedlas.getSupportedAnalyzeLocales.toSeq.map(_.toString) else locales)) match {
       case Some(lang) => 
-        val analysis = Json.toJson(combinedlas.analyze(text, new Locale(lang),forms,segments,guess).toList)
+        val analysis = Json.toJson(combinedlas.analyze(text, new Locale(lang),forms,segments,guess,segmentGuessed).toList)
         if (pretty) {
           if (locales.isEmpty) Some(Json.prettyPrint(Json.toJson(Map("locale" -> Json.toJson(lang), "analysis" -> analysis))))
           else Some(Json.prettyPrint(analysis))

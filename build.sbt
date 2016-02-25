@@ -11,7 +11,7 @@ libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test"
 //libraryDependencies += "com.typesafe.akka" % "akka-actor_2.11" % "2.3.9"
 
 libraryDependencies ++= Seq(
-    "fi.seco" % "lexicalanalysis" % "1.2.0",
+    "fi.seco" % "lexicalanalysis" % "1.3.0",
     "com.cybozu.labs" % "langdetect" % "1.2.2" exclude("net.arnx.jsonic", "jsonic"),
     "net.arnx" % "jsonic" % "1.3.0", //langdetect pulls in ancient unavailable version
     "com.github.scopt" %% "scopt" % "3.3.0",
