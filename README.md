@@ -3,7 +3,7 @@ Lexical Analysis Command-Line Tool for lemmatizing, lexical analysis and languag
 
 Program help:
 ```
-las 1.2.0
+las 1.2.1
 Usage: las [lemmatize|analyze|inflect|identify] [options] [<file>...]
 
 Command: lemmatize
