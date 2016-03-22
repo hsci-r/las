@@ -29,7 +29,7 @@ object LASCommandLineTool {
 
   object Action extends Enumeration {
     type Action = Value
-    val Inflect, Lemmatize, Analyze, Detect = Value
+    val Inflect, Lemmatize, Analyze, Detect, Recognize = Value
   }
 
   implicit val actionRead: scopt.Read[Action.Value] = scopt.Read.reads(Action withName _)
@@ -44,7 +44,7 @@ object LASCommandLineTool {
 
   def main(args: Array[String]) = {
     val parser = new scopt.OptionParser[Config]("las") {
-      head("las", "1.2.1")
+      head("las", "1.3.0")
       cmd("lemmatize") action { (_, c) =>
         c.copy(action = Action.Lemmatize)
       } text (s"(locales: ${compoundlas.getSupportedBaseformLocales.mkString(", ")})")
@@ -54,6 +54,9 @@ object LASCommandLineTool {
       cmd("inflect") action { (_, c) =>
         c.copy(action = Action.Inflect)
       } text (s"(locales: ${combinedlas.getSupportedInflectionLocales.mkString(", ")})")
+      cmd("recognize") action { (_, c) =>
+        c.copy(action = Action.Recognize)
+      } text (s"report recognition rate (locales: ${combinedlas.getSupportedAnalyzeLocales.mkString(", ")}")
       cmd("identify") action { (_, c) =>
         c.copy(action = Action.Detect)
       } text (s"identify language (locales: ${(LanguageRecognizer.getAvailableLanguages ++ LanguageDetector.supportedLanguages ++ compoundlas.getSupportedBaseformLocales).toSet.mkString(", ")})")
@@ -133,6 +136,18 @@ object LASCommandLineTool {
               text = StdIn.readLine()
             }
           }
+          case Action.Recognize => if (!config.files.isEmpty) {
+            for (
+              file <- config.files;
+              text = Source.fromFile(file).mkString; out = recognize(text, config.locale,config.pretty)
+            ) writeFile(file + ".recognition", out);
+          } else {
+            var text = StdIn.readLine()
+            while (text != null) {
+              println(recognize(text, config.locale,config.pretty));
+              text = StdIn.readLine()
+            }
+          }
         }
       case None =>
     }
@@ -192,6 +207,18 @@ object LASCommandLineTool {
       case None       => None
     }
   }
+  
+  def recognize(text: String, locales: Seq[String], pretty:Boolean): String = {
+    (if (locales.length==1) Some(locales(0)) else getBestLang(text, if (locales.isEmpty) combinedlas.getSupportedAnalyzeLocales.toSeq.map(_.toString) else locales)) match {
+      case Some(lang) =>
+        val analysis = combinedlas.recognize(text, new Locale(lang))
+        val ret = Json.toJson(Map("locale" -> Json.toJson(lang), "recognized" -> Json.toJson(analysis.getRecognized), "unrecognized" -> Json.toJson(analysis.getUnrecognized), "rate" -> Json.toJson(analysis.getRate)))
+        if (pretty) Json.prettyPrint(ret)
+        else
+          ret.toString()
+      case None => "{ \"locale\": \"?\", \"recognized\": \"0\", \"unrecognized\": \""+(text.split("\\s+").length)+"\", \"rate\": \"0.0\" }"
+    }
+  }
 
   def inflect(text: String, locales: Seq[String],forms:Seq[String],segments:Boolean,guess:Boolean): Option[String] = {
     (if (locales.length==1) Some(locales(0)) else getBestLang(text, if (locales.isEmpty) compoundlas.getSupportedInflectionLocales.toSeq.map(_.toString) else locales)) match {
@@ -210,7 +237,7 @@ object LASCommandLineTool {
       detector.append(text)
       val ldResult = detector.getProbabilities().map(l => Map(l.lang -> l.prob))
       val hfstResultTmp = hfstlas.getSupportedAnalyzeLocales.map(lang =>
-            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2!=0.0).toSeq.sortBy(_._2).reverse.map(p => (p._1,p._2*p._2))
+            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
       val hfstResult = hfstResultTmp.map(p => Map(p._1 -> p._2 / tc))
       Try(Some((ldResult ++ hfstResult ++ lrResult).groupBy(_.keysIterator.next).mapValues(_.foldRight(0.0) { (p, r) => r + p.valuesIterator.next } / 3.0).maxBy(_._2)._1)).getOrElse(None)
@@ -221,7 +248,7 @@ object LASCommandLineTool {
       detector.append(text)
       val ldResult = detector.getProbabilities().map(l => Map(l.lang -> l.prob))
       val hfstResultTmp = locales.map(new Locale(_)).intersect(hfstlas.getSupportedAnalyzeLocales.toSeq).map(lang =>
-            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2!=0.0).toSeq.sortBy(_._2).reverse.map(p => (p._1,p._2*p._2))
+            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
       val hfstResult = hfstResultTmp.map(p => Map(p._1 -> p._2 / tc))
       Try(Some((ldResult ++ hfstResult ++ lrResult).groupBy(_.keysIterator.next).mapValues(_.foldRight(0.0) { (p, r) => r + p.valuesIterator.next } / 3.0).maxBy(_._2)._1)).getOrElse(None)
@@ -236,7 +263,7 @@ object LASCommandLineTool {
       detector.append(text)
       val ldResult = Try(detector.getProbabilities().map(l => Map(l.lang -> l.prob))).getOrElse(Seq.empty)
       val hfstResultTmp = locales.map(new Locale(_)).intersect(hfstlas.getSupportedAnalyzeLocales.toSeq).map(lang =>
-            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2!=0.0).toSeq.sortBy(_._2).reverse.map(p => (p._1,p._2*p._2))
+            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
       val hfstResult = hfstResultTmp.map(p => Map(p._1 -> p._2 / tc))
       val bestGuess = Try(Some((ldResult ++ hfstResult ++ lrResult).groupBy(_.keysIterator.next).mapValues(_.foldRight(0.0) { (p, r) => r + p.valuesIterator.next } / 3.0).maxBy(_._2))).getOrElse(None)
@@ -250,7 +277,7 @@ object LASCommandLineTool {
       detector.append(text)
       val ldResult = Try(detector.getProbabilities().map(l => Map(l.lang -> l.prob))).getOrElse(Seq.empty)
       val hfstResultTmp = hfstlas.getSupportedAnalyzeLocales.map(lang =>
-            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2!=0.0).toSeq.sortBy(_._2).reverse.map(p => (p._1,p._2*p._2))
+            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
       val hfstResult = hfstResultTmp.map(p => Map(p._1 -> p._2 / tc))
       val bestGuess = Try(Some((ldResult ++ hfstResult ++ lrResult).groupBy(_.keysIterator.next).mapValues(_.foldRight(0.0) { (p, r) => r + p.valuesIterator.next } / 3.0).maxBy(_._2))).getOrElse(None)
