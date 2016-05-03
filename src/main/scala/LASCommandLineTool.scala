@@ -18,7 +18,10 @@ import play.api.libs.json.Json
 import fi.seco.lexical.hfst.HFSTLexicalAnalysisService.WordToResults
 import play.api.libs.json.Writes
 import java.util.Collections
-import com.cybozu.labs.langdetect.LangDetectException
+import com.optimaize.langdetect.LanguageDetectorBuilder
+import com.optimaize.langdetect.ngram.NgramExtractors
+import com.optimaize.langdetect.profiles.LanguageProfileReader
+import com.optimaize.langdetect.text.CommonTextObjectFactories
 
 object LASCommandLineTool {
 
@@ -26,7 +29,15 @@ object LASCommandLineTool {
   lazy val combinedlas = new CombinedLexicalAnalysisService
   lazy val snowballlas = new SnowballLexicalAnalysisService
   lazy val compoundlas = new CompoundLexicalAnalysisService(combinedlas, snowballlas)
-
+  
+  object LanguageDetector extends LazyLogging {
+    val languageProfiles = new LanguageProfileReader().readAllBuiltIn()
+    val supportedLanguages = languageProfiles.map(_.getLocale.toString())
+    val detector = LanguageDetectorBuilder.create(NgramExtractors.standard()).withProfiles(languageProfiles).build()
+    val textObjectFactory = CommonTextObjectFactories.forDetectingOnLargeText()
+    def apply(text: String) = detector.getProbabilities(textObjectFactory.forText(text))
+  }
+   
   object Action extends Enumeration {
     type Action = Value
     val Inflect, Lemmatize, Analyze, Detect, Recognize = Value
@@ -44,7 +55,7 @@ object LASCommandLineTool {
 
   def main(args: Array[String]) = {
     val parser = new scopt.OptionParser[Config]("las") {
-      head("las", "1.4.0")
+      head("las", "1.4.1")
       cmd("lemmatize") action { (_, c) =>
         c.copy(action = Action.Lemmatize)
       } text (s"(locales: ${compoundlas.getSupportedBaseformLocales.mkString(", ")})")
@@ -236,9 +247,7 @@ object LASCommandLineTool {
   def getBestLang(text: String, locales: Seq[String]): Option[String] = {
     if (locales.isEmpty) {
       val lrResult = Option(LanguageRecognizer.getLanguageAsObject(text)).map(r => Map(r.getLang() -> r.getIndex))
-      val detector = LanguageDetector()
-      detector.append(text)
-      val ldResult = detector.getProbabilities().map(l => Map(l.lang -> l.prob))
+      val ldResult = Try(LanguageDetector(text).map(l => Map(l.getLocale.toString -> l.getProbability))).getOrElse(Seq.empty)
       val hfstResultTmp = hfstlas.getSupportedAnalyzeLocales.map(lang =>
             (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
@@ -246,10 +255,7 @@ object LASCommandLineTool {
       Try(Some((ldResult ++ hfstResult ++ lrResult).groupBy(_.keysIterator.next).mapValues(_.foldRight(0.0) { (p, r) => r + p.valuesIterator.next } / 3.0).maxBy(_._2)._1)).getOrElse(None)
     } else {
       val lrResult = Option(LanguageRecognizer.getLanguageAsObject(text, locales: _*)).map(r => Map(r.getLang() -> r.getIndex))
-      val detector = LanguageDetector()
-      detector.setPriorMap(new HashMap(mapAsJavaMap(locales.map((_, new java.lang.Double(1.0))).toMap)))
-      detector.append(text)
-      val ldResult = detector.getProbabilities().map(l => Map(l.lang -> l.prob))
+      val ldResult = Try(LanguageDetector(text).filter(d => locales.contains(d.getLocale.toString)).map(l => Map(l.getLocale.toString -> l.getProbability))).getOrElse(Seq.empty)
       val hfstResultTmp = locales.map(new Locale(_)).intersect(hfstlas.getSupportedAnalyzeLocales.toSeq).map(lang =>
             (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
@@ -261,10 +267,7 @@ object LASCommandLineTool {
   def identify(text: String, locales: Seq[String]): Option[String] = {
     if (!locales.isEmpty) {
       val lrResult = Option(LanguageRecognizer.getLanguageAsObject(text, locales: _*)).map(r => Map(r.getLang() -> r.getIndex))
-      val detector = LanguageDetector()
-      detector.setPriorMap(new HashMap(mapAsJavaMap(locales.map((_, new java.lang.Double(1.0))).toMap)))
-      detector.append(text)
-      val ldResult = Try(detector.getProbabilities().map(l => Map(l.lang -> l.prob))).getOrElse(Seq.empty)
+      val ldResult = Try(LanguageDetector(text).filter(d => locales.contains(d.getLocale.toString)).map(l => Map(l.getLocale.toString -> l.getProbability))).getOrElse(Seq.empty)
       val hfstResultTmp = locales.map(new Locale(_)).intersect(hfstlas.getSupportedAnalyzeLocales.toSeq).map(lang =>
             (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
@@ -276,9 +279,7 @@ object LASCommandLineTool {
       }
     } else {
       val lrResult = Option(LanguageRecognizer.getLanguageAsObject(text)).map(r => Map(r.getLang() -> r.getIndex))
-      val detector = LanguageDetector()
-      detector.append(text)
-      val ldResult = Try(detector.getProbabilities().map(l => Map(l.lang -> l.prob))).getOrElse(Seq.empty)
+      val ldResult = Try(LanguageDetector(text).map(l => Map(l.getLocale.toString -> l.getProbability))).getOrElse(Seq.empty)
       val hfstResultTmp = hfstlas.getSupportedAnalyzeLocales.map(lang =>
             (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
@@ -291,14 +292,4 @@ object LASCommandLineTool {
     }
   }
 
-}
-
-object LanguageDetector extends LazyLogging {
-  def apply() = com.cybozu.labs.langdetect.DetectorFactory.create()
-  val supportedLanguages = Array("af", "am", "ar", "az", "be", "bg", "bn", "bo", "ca", "cs", "cy", "da", "de", "dv", "el", "en", "es", "et", "eu", "fa", "fi", "fo", "fr", "ga", "gn", "gu", "he", "hi", "hr", "hu", "hy", "id", "is", "it", "ja", "jv", "ka", "kk", "km", "kn", "ko", "ky", "lb", "lij", "ln", "lt", "lv", "mi", "mk", "ml", "mn", "mr", "mt", "my", "ne", "nl", "no", "os", "pa", "pl", "pnb", "pt", "qu", "ro", "si", "sk", "so", "sq", "sr", "sv", "sw", "ta", "te", "th", "tk", "tl", "tr", "tt", "ug", "uk", "ur", "uz", "vi", "yi", "yo", "zh-cn", "zh-tw")
-  try {
-    com.cybozu.labs.langdetect.DetectorFactory.loadProfiles(supportedLanguages: _*)
-  } catch {
-    case e: Exception => logger.warn("Couldn't load language profiles", e)
-  }
 }

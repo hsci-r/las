@@ -1,23 +1,16 @@
 name := """las-cl"""
 
-version := "1.3.0"
+version := "1.4.1"
 
-scalaVersion := "2.11.5"
-
-// Change this to another test framework if you prefer
-libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % "test"
-
-// Uncomment to use Akka
-//libraryDependencies += "com.typesafe.akka" % "akka-actor_2.11" % "2.3.9"
+scalaVersion := "2.11.8"
 
 libraryDependencies ++= Seq(
     "fi.seco" % "lexicalanalysis" % "1.4.3",
-    "com.cybozu.labs" % "langdetect" % "1.2.2" exclude("net.arnx.jsonic", "jsonic"),
-    "net.arnx" % "jsonic" % "1.3.0", //langdetect pulls in ancient unavailable version
-    "com.github.scopt" %% "scopt" % "3.3.0",
-    "com.typesafe.play" %% "play-json" % "2.3.4",
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
-    "ch.qos.logback" % "logback-classic" % "1.1.2" % "runtime"
+    "com.optimaize.languagedetector" % "language-detector" % "0.5",
+    "com.github.scopt" %% "scopt" % "3.4.0",
+    "com.typesafe.play" %% "play-json" % "2.5.3",
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0",
+    "ch.qos.logback" % "logback-classic" % "1.1.7" % "runtime"
 )
 resolvers ++= Seq(
     "Local Maven Repository" at Path.userHome.asFile.toURI.toURL + ".m2/repository")
