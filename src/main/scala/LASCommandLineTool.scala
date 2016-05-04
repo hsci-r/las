@@ -45,17 +45,11 @@ object LASCommandLineTool {
 
   implicit val actionRead: scopt.Read[Action.Value] = scopt.Read.reads(Action withName _)
 
-  case class Config(action: Action.Action = null, locale: Seq[String] = Seq(), forms: Seq[String] = Seq(), segments: Boolean = false, guess: Boolean = true, segmentGuessed: Boolean = true, maxEditDistance: Int = 0, pretty: Boolean = true, files: Seq[String] = Seq())
-
-  def writeFile(file: String, text: String): Unit = {
-    val writer = new PrintWriter(new File(file))
-    writer.write(text);
-    writer.close()
-  }
+  case class Config(action: Action.Action = null, locale: Seq[String] = Seq(), forms: Seq[String] = Seq(), segmentBaseforms: Boolean = false, byParagraph: Boolean = false, guess: Boolean = true, segmentGuessed: Boolean = true, maxEditDistance: Int = 0, pretty: Boolean = true, files: Seq[String] = Seq())
 
   def main(args: Array[String]) = {
     val parser = new scopt.OptionParser[Config]("las") {
-      head("las", "1.4.1")
+      head("las", "1.4.2")
       cmd("lemmatize") action { (_, c) =>
         c.copy(action = Action.Lemmatize)
       } text (s"(locales: ${compoundlas.getSupportedBaseformLocales.mkString(", ")})")
@@ -78,14 +72,17 @@ object LASCommandLineTool {
         c.copy(forms = x)
       } text ("inclection forms for inflect/analyze")
       opt[Unit]("segment") action { (_, c) =>
-        c.copy(segments = true)
-      } text ("segment compound words?")
+        c.copy(segmentBaseforms = true)
+      } text ("segment baseforms?")
       opt[Unit]("no-guess") action { (_, c) =>
         c.copy(guess = false)
       } text ("Don't guess baseforms for unknown words?")
       opt[Unit]("no-segment-guessed") action { (_, c) =>
         c.copy(segmentGuessed = false)
       } text ("Don't guess segmentation information for guessed words (speeds up processing significantly)?")
+      opt[Unit]("by-paragraph") action { (_, c) =>
+        c.copy(byParagraph = true)
+      } text ("Analyze by paragraph when processing files?")
       opt[Int]("max-edit-distance") action { (x, c) =>
         c.copy(maxEditDistance = x)
       } text ("Maximum edit distance for error-correcting unidentified words (default 0)?")
@@ -102,59 +99,103 @@ object LASCommandLineTool {
     parser.parse(args, Config()) match {
       case Some(config) =>
         config.action match {
-          case Action.Lemmatize => if (!config.files.isEmpty) {
-            for (
-              file <- config.files;
-              text = Source.fromFile(file).mkString; out = lemmatize(text, config.locale,config.segments,config.guess,config.maxEditDistance); if out.isDefined
-            ) writeFile(file + ".lemmatized", out.get);
+          case Action.Lemmatize => if (!config.files.isEmpty) for (file <- config.files) {
+            val writer = new PrintWriter(new File(file+".lemmatized"))
+            val paragraphs = if (config.byParagraph) Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq else Seq(Source.fromFile(file).mkString)
+            var i = 0
+            for (paragraph <- paragraphs) {
+              val lemma = lemmatize(paragraph, config.locale,config.segmentBaseforms,config.guess,config.maxEditDistance).getOrElse(paragraph)
+              writer.write(lemma)
+              i += 1
+              if (i!=paragraphs.length) writer.write("\n\n")
+            }
+            writer.close()
           } else {
             var text = StdIn.readLine()
             while (text != null) {
-              println(lemmatize(text, config.locale,config.segments,config.guess,config.maxEditDistance).getOrElse("?"));
+              println(lemmatize(text, config.locale,config.segmentBaseforms,config.guess,config.maxEditDistance).getOrElse(text));
               text = StdIn.readLine()
             }
           }
-          case Action.Analyze => if (!config.files.isEmpty) {
-            for (
-              file <- config.files;
-              text = Source.fromFile(file).mkString; out = analyze(text, config.locale,config.forms,config.segments,config.guess,config.segmentGuessed,config.maxEditDistance,config.pretty); if out.isDefined
-            ) writeFile(file + ".analysis", out.get);
+          case Action.Analyze => if (!config.files.isEmpty) for (file <- config.files) {
+            val writer = new PrintWriter(new File(file+".analysis"))
+            val paragraphs = if (config.byParagraph) Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq else Seq(Source.fromFile(file).mkString)            
+            var i = 0
+            if (config.byParagraph) writer.write('[')
+            for (paragraph <- paragraphs) {
+              val analysis = analyze(paragraph, config.locale,config.forms,config.segmentBaseforms,config.guess,config.segmentGuessed,config.maxEditDistance,config.pretty).getOrElse("{}")
+              writer.write(analysis)
+              i += 1
+              if (i!=paragraphs.length) {
+                writer.write(",")
+                if (config.pretty) writer.write('\n');
+              }
+            }
+            if (config.byParagraph) writer.write(']')
+            writer.close()
           } else {
             var text = StdIn.readLine()
             while (text != null) {
-              println(analyze(text, config.locale,config.forms,config.segments,config.guess,config.segmentGuessed,config.maxEditDistance,config.pretty).getOrElse("?"));
+              println(analyze(text, config.locale,config.forms,config.segmentBaseforms,config.guess,config.segmentGuessed,config.maxEditDistance,config.pretty).getOrElse("?"));
               text = StdIn.readLine()
             }
           }
-          case Action.Inflect => if (!config.files.isEmpty) {
-            for (
-              file <- config.files;
-              text = Source.fromFile(file).mkString; out = inflect(text, config.locale,config.forms,config.segments,config.guess,config.maxEditDistance); if out.isDefined
-            ) writeFile(file + ".inflected", out.get);
+          case Action.Inflect => if (!config.files.isEmpty) for (file <- config.files) {
+            val writer = new PrintWriter(new File(file+".inflected"))
+            val paragraphs = if (config.byParagraph) Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq else Seq(Source.fromFile(file).mkString)
+            var i = 0
+            for (paragraph <- paragraphs) inflect(paragraph, config.locale,config.forms,config.segmentBaseforms,config.guess,config.maxEditDistance).foreach(u => {
+              writer.write(u)
+              i += 1
+              if (i!=paragraphs.length) writer.write("\n\n")
+            })
+            writer.close()
           } else {
             var text = StdIn.readLine()
             while (text != null) {
-              println(inflect(text, config.locale,config.forms,config.segments,config.guess,config.maxEditDistance).getOrElse("?"));
+              println(inflect(text, config.locale,config.forms,config.segmentBaseforms,config.guess,config.maxEditDistance).getOrElse("?"));
               text = StdIn.readLine()
             }
           }
-          case Action.Detect => if (!config.files.isEmpty) {
-            for (
-              file <- config.files;
-              text = Source.fromFile(file).mkString; out = identify(text, config.locale); if out.isDefined
-            ) writeFile(file + ".language", out.get);
+          case Action.Detect => if (!config.files.isEmpty) for (file <- config.files) {
+            val writer = new PrintWriter(new File(file+".language"))
+            val paragraphs = if (config.byParagraph) Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq else Seq(Source.fromFile(file).mkString)            
+            var i = 0 
+            if (config.byParagraph) writer.write('[')
+            for (paragraph <- paragraphs) {
+              val analysis = identify(paragraph, config.locale,config.pretty).getOrElse("{}")
+              writer.write(analysis)
+              i += 1
+              if (i!=paragraphs.length) {
+                writer.write(",")
+                if (config.pretty) writer.write('\n');
+              }
+            }
+            if (config.byParagraph) writer.write(']')
+            writer.close()
           } else {
             var text = StdIn.readLine()
             while (text != null) {
-              println(identify(text, config.locale).getOrElse("?"));
+              println(identify(text, config.locale,config.pretty).getOrElse("?"));
               text = StdIn.readLine()
             }
           }
-          case Action.Recognize => if (!config.files.isEmpty) {
-            for (
-              file <- config.files;
-              text = Source.fromFile(file).mkString; out = recognize(text, config.locale,config.pretty)
-            ) writeFile(file + ".recognition", out);
+          case Action.Recognize => if (!config.files.isEmpty) for (file <- config.files) {
+            val writer = new PrintWriter(new File(file+".recognition"))
+            val paragraphs = if (config.byParagraph) Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq else Seq(Source.fromFile(file).mkString)            
+            var i = 0
+            if (config.byParagraph) writer.write('[')
+            for (paragraph <- paragraphs) {
+              val analysis = recognize(paragraph, config.locale,config.pretty)
+              writer.write(analysis)
+              i += 1
+              if (i!=paragraphs.length) {
+                writer.write(",")
+                if (config.pretty) writer.write('\n');
+              }
+            }
+            if (config.byParagraph) writer.write(']')
+            writer.close()
           } else {
             var text = StdIn.readLine()
             while (text != null) {
@@ -264,8 +305,8 @@ object LASCommandLineTool {
     }
   }
 
-  def identify(text: String, locales: Seq[String]): Option[String] = {
-    if (!locales.isEmpty) {
+  def identify(text: String, locales: Seq[String], pretty: Boolean): Option[String] = {
+    val ret = if (!locales.isEmpty) {
       val lrResult = Option(LanguageRecognizer.getLanguageAsObject(text, locales: _*)).map(r => Map(r.getLang() -> r.getIndex))
       val ldResult = Try(LanguageDetector(text).filter(d => locales.contains(d.getLocale.toString)).map(l => Map(l.getLocale.toString -> l.getProbability))).getOrElse(Seq.empty)
       val hfstResultTmp = locales.map(new Locale(_)).intersect(hfstlas.getSupportedAnalyzeLocales.toSeq).map(lang =>
@@ -274,7 +315,7 @@ object LASCommandLineTool {
       val hfstResult = hfstResultTmp.map(p => Map(p._1 -> p._2 / tc))
       val bestGuess = Try(Some((ldResult ++ hfstResult ++ lrResult).groupBy(_.keysIterator.next).mapValues(_.foldRight(0.0) { (p, r) => r + p.valuesIterator.next } / 3.0).maxBy(_._2))).getOrElse(None)
       bestGuess match {
-        case Some(lang) => Some(Json.toJson(Map("locale" -> Json.toJson(lang._1), "certainty" -> Json.toJson(lang._2), "details" -> Json.toJson(Map("languageRecognizerResults" -> Json.toJson(lrResult), "languageDetectorResults" -> Json.toJson(ldResult), "hfstAcceptorResults" -> Json.toJson(hfstResult))))).toString())
+        case Some(lang) => Some(Json.toJson(Map("locale" -> Json.toJson(lang._1), "certainty" -> Json.toJson(lang._2), "details" -> Json.toJson(Map("languageRecognizerResults" -> Json.toJson(lrResult), "languageDetectorResults" -> Json.toJson(ldResult), "hfstAcceptorResults" -> Json.toJson(hfstResult))))))
         case None       => None
       }
     } else {
@@ -286,10 +327,11 @@ object LASCommandLineTool {
       val hfstResult = hfstResultTmp.map(p => Map(p._1 -> p._2 / tc))
       val bestGuess = Try(Some((ldResult ++ hfstResult ++ lrResult).groupBy(_.keysIterator.next).mapValues(_.foldRight(0.0) { (p, r) => r + p.valuesIterator.next } / 3.0).maxBy(_._2))).getOrElse(None)
       bestGuess match {
-        case Some(lang) => Some(Json.toJson(Map("locale" -> Json.toJson(lang._1), "certainty" -> Json.toJson(lang._2), "details" -> Json.toJson(Map("languageRecognizerResults" -> Json.toJson(lrResult), "languageDetectorResults" -> Json.toJson(ldResult), "hfstAcceptorResults" -> Json.toJson(hfstResult))))).toString())
+        case Some(lang) => Some(Json.toJson(Map("locale" -> Json.toJson(lang._1), "certainty" -> Json.toJson(lang._2), "details" -> Json.toJson(Map("languageRecognizerResults" -> Json.toJson(lrResult), "languageDetectorResults" -> Json.toJson(ldResult), "hfstAcceptorResults" -> Json.toJson(hfstResult))))))
         case None       => None
       }
     }
+    ret.map(ret => if (pretty) Json.prettyPrint(ret) else ret.toString())
   }
 
 }
