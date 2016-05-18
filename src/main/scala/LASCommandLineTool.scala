@@ -116,8 +116,10 @@ object LASCommandLineTool {
               val lemma = lemmatize(paragraph, config.locale,config.segmentBaseforms,config.guess,config.maxEditDistance).getOrElse(paragraph)
               writer.write(lemma)
               i += 1
-              if (i!=paragraphs.length) writer.write("\n\n")
-            }
+              if (i!=paragraphs.length) {
+                writer.write("\n")
+                if (config.processBy == ProcessBy.Paragraph) writer.write("\n")
+              }            }
             writer.close()
           } else {
             var text = StdIn.readLine()
@@ -165,7 +167,10 @@ object LASCommandLineTool {
             for (paragraph <- paragraphs) inflect(paragraph, config.locale,config.forms,config.segmentBaseforms,config.guess,config.maxEditDistance).foreach(u => {
               writer.write(u)
               i += 1
-              if (i!=paragraphs.length) writer.write("\n\n")
+              if (i!=paragraphs.length) {
+                writer.write("\n")
+                if (config.processBy == ProcessBy.Paragraph) writer.write("\n")
+              }
             })
             writer.close()
           } else {
