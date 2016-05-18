@@ -37,6 +37,11 @@ object LASCommandLineTool {
     val textObjectFactory = CommonTextObjectFactories.forDetectingOnLargeText()
     def apply(text: String) = detector.getProbabilities(textObjectFactory.forText(text))
   }
+  
+  object ProcessBy extends Enumeration {
+    type ProcessBy = Value
+    val File, Paragraph, Line = Value
+  }
    
   object Action extends Enumeration {
     type Action = Value
@@ -45,7 +50,7 @@ object LASCommandLineTool {
 
   implicit val actionRead: scopt.Read[Action.Value] = scopt.Read.reads(Action withName _)
 
-  case class Config(action: Action.Action = null, locale: Seq[String] = Seq(), forms: Seq[String] = Seq(), segmentBaseforms: Boolean = false, byParagraph: Boolean = false, guess: Boolean = true, segmentGuessed: Boolean = true, maxEditDistance: Int = 0, pretty: Boolean = true, files: Seq[String] = Seq())
+  case class Config(action: Action.Action = null, locale: Seq[String] = Seq(), forms: Seq[String] = Seq(), segmentBaseforms: Boolean = false, processBy: ProcessBy.ProcessBy = ProcessBy.File, guess: Boolean = true, segmentGuessed: Boolean = true, maxEditDistance: Int = 0, pretty: Boolean = true, files: Seq[String] = Seq())
 
   def main(args: Array[String]) = {
     val parser = new scopt.OptionParser[Config]("las") {
@@ -61,7 +66,7 @@ object LASCommandLineTool {
       } text (s"(locales: ${combinedlas.getSupportedInflectionLocales.mkString(", ")})")
       cmd("recognize") action { (_, c) =>
         c.copy(action = Action.Recognize)
-      } text (s"report recognition rate (locales: ${combinedlas.getSupportedAnalyzeLocales.mkString(", ")}")
+      } text (s"report word recognition rate (locales: ${combinedlas.getSupportedAnalyzeLocales.mkString(", ")}")
       cmd("identify") action { (_, c) =>
         c.copy(action = Action.Detect)
       } text (s"identify language (locales: ${(LanguageRecognizer.getAvailableLanguages ++ LanguageDetector.supportedLanguages ++ compoundlas.getSupportedBaseformLocales).toSet.mkString(", ")})")
@@ -80,9 +85,9 @@ object LASCommandLineTool {
       opt[Unit]("no-segment-guessed") action { (_, c) =>
         c.copy(segmentGuessed = false)
       } text ("Don't guess segmentation information for guessed words (speeds up processing significantly)?")
-      opt[Unit]("by-paragraph") action { (_, c) =>
-        c.copy(byParagraph = true)
-      } text ("Analyze by paragraph when processing files?")
+      opt[String]("process-by") action { (x, c) =>
+        c.copy(processBy = ProcessBy.withName(x.charAt(0).toUpper + x.toLowerCase))
+      } text ("Analysis unit when processing files (file, paragraph, line)?")
       opt[Int]("max-edit-distance") action { (x, c) =>
         c.copy(maxEditDistance = x)
       } text ("Maximum edit distance for error-correcting unidentified words (default 0)?")
@@ -101,7 +106,11 @@ object LASCommandLineTool {
         config.action match {
           case Action.Lemmatize => if (!config.files.isEmpty) for (file <- config.files) {
             val writer = new PrintWriter(new File(file+".lemmatized"))
-            val paragraphs = if (config.byParagraph) Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq else Seq(Source.fromFile(file).mkString)
+            val paragraphs = config.processBy match {
+              case ProcessBy.File => Seq(Source.fromFile(file).mkString)
+              case ProcessBy.Paragraph => Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq
+              case ProcessBy.Line => Source.fromFile(file).mkString.split("\n").toSeq
+            }
             var i = 0
             for (paragraph <- paragraphs) {
               val lemma = lemmatize(paragraph, config.locale,config.segmentBaseforms,config.guess,config.maxEditDistance).getOrElse(paragraph)
@@ -119,9 +128,14 @@ object LASCommandLineTool {
           }
           case Action.Analyze => if (!config.files.isEmpty) for (file <- config.files) {
             val writer = new PrintWriter(new File(file+".analysis"))
-            val paragraphs = if (config.byParagraph) Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq else Seq(Source.fromFile(file).mkString)            
+            val paragraphs = config.processBy match {
+              case ProcessBy.File => Seq(Source.fromFile(file).mkString)
+              case ProcessBy.Paragraph => Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq
+              case ProcessBy.Line => Source.fromFile(file).mkString.split("\n").toSeq
+            }
             var i = 0
-            if (config.byParagraph) writer.write('[')
+            println(paragraphs)
+            if (config.processBy!=ProcessBy.File) writer.write('[')
             for (paragraph <- paragraphs) {
               val analysis = analyze(paragraph, config.locale,config.forms,config.segmentBaseforms,config.guess,config.segmentGuessed,config.maxEditDistance,config.pretty).getOrElse("{}")
               writer.write(analysis)
@@ -131,7 +145,7 @@ object LASCommandLineTool {
                 if (config.pretty) writer.write('\n');
               }
             }
-            if (config.byParagraph) writer.write(']')
+            if (config.processBy!=ProcessBy.File) writer.write(']')
             writer.close()
           } else {
             var text = StdIn.readLine()
@@ -142,7 +156,11 @@ object LASCommandLineTool {
           }
           case Action.Inflect => if (!config.files.isEmpty) for (file <- config.files) {
             val writer = new PrintWriter(new File(file+".inflected"))
-            val paragraphs = if (config.byParagraph) Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq else Seq(Source.fromFile(file).mkString)
+            val paragraphs = config.processBy match {
+              case ProcessBy.File => Seq(Source.fromFile(file).mkString)
+              case ProcessBy.Paragraph => Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq
+              case ProcessBy.Line => Source.fromFile(file).mkString.split("\n").toSeq
+            }
             var i = 0
             for (paragraph <- paragraphs) inflect(paragraph, config.locale,config.forms,config.segmentBaseforms,config.guess,config.maxEditDistance).foreach(u => {
               writer.write(u)
@@ -159,9 +177,13 @@ object LASCommandLineTool {
           }
           case Action.Detect => if (!config.files.isEmpty) for (file <- config.files) {
             val writer = new PrintWriter(new File(file+".language"))
-            val paragraphs = if (config.byParagraph) Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq else Seq(Source.fromFile(file).mkString)            
+            val paragraphs = config.processBy match {
+              case ProcessBy.File => Seq(Source.fromFile(file).mkString)
+              case ProcessBy.Paragraph => Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq
+              case ProcessBy.Line => Source.fromFile(file).mkString.split("\n").toSeq
+            }
             var i = 0 
-            if (config.byParagraph) writer.write('[')
+            if (config.processBy!=ProcessBy.File) writer.write('[')
             for (paragraph <- paragraphs) {
               val analysis = identify(paragraph, config.locale,config.pretty).getOrElse("{}")
               writer.write(analysis)
@@ -171,7 +193,7 @@ object LASCommandLineTool {
                 if (config.pretty) writer.write('\n');
               }
             }
-            if (config.byParagraph) writer.write(']')
+            if (config.processBy!=ProcessBy.File) writer.write(']')
             writer.close()
           } else {
             var text = StdIn.readLine()
@@ -182,9 +204,13 @@ object LASCommandLineTool {
           }
           case Action.Recognize => if (!config.files.isEmpty) for (file <- config.files) {
             val writer = new PrintWriter(new File(file+".recognition"))
-            val paragraphs = if (config.byParagraph) Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq else Seq(Source.fromFile(file).mkString)            
+            val paragraphs = config.processBy match {
+              case ProcessBy.File => Seq(Source.fromFile(file).mkString)
+              case ProcessBy.Paragraph => Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq
+              case ProcessBy.Line => Source.fromFile(file).mkString.split("\n").toSeq
+            }
             var i = 0
-            if (config.byParagraph) writer.write('[')
+            if (config.processBy!=ProcessBy.File) writer.write('[')
             for (paragraph <- paragraphs) {
               val analysis = recognize(paragraph, config.locale,config.pretty)
               writer.write(analysis)
@@ -194,7 +220,7 @@ object LASCommandLineTool {
                 if (config.pretty) writer.write('\n');
               }
             }
-            if (config.byParagraph) writer.write(']')
+            if (config.processBy!=ProcessBy.File) writer.write(']')
             writer.close()
           } else {
             var text = StdIn.readLine()
