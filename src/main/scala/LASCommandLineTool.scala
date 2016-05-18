@@ -86,7 +86,7 @@ object LASCommandLineTool {
         c.copy(segmentGuessed = false)
       } text ("Don't guess segmentation information for guessed words (speeds up processing significantly)?")
       opt[String]("process-by") action { (x, c) =>
-        c.copy(processBy = ProcessBy.withName(x.charAt(0).toUpper + x.toLowerCase))
+        c.copy(processBy = ProcessBy.withName(x.charAt(0).toUpper + x.substring(1).toLowerCase))
       } text ("Analysis unit when processing files (file, paragraph, line)?")
       opt[Int]("max-edit-distance") action { (x, c) =>
         c.copy(maxEditDistance = x)
@@ -136,7 +136,6 @@ object LASCommandLineTool {
               case ProcessBy.Line => Source.fromFile(file).mkString.split("\n").toSeq
             }
             var i = 0
-            println(paragraphs)
             if (config.processBy!=ProcessBy.File) writer.write('[')
             for (paragraph <- paragraphs) {
               val analysis = analyze(paragraph, config.locale,config.forms,config.segmentBaseforms,config.guess,config.segmentGuessed,config.maxEditDistance,config.pretty).getOrElse("{}")
