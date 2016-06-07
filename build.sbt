@@ -5,7 +5,7 @@ version := "1.4.2"
 scalaVersion := "2.11.8"
 
 libraryDependencies ++= Seq(
-    "fi.seco" % "lexicalanalysis" % "1.4.4",
+    "fi.seco" % "lexicalanalysis" % "1.4.5",
     "com.optimaize.languagedetector" % "language-detector" % "0.5",
     "com.github.scopt" %% "scopt" % "3.4.0",
     "com.typesafe.play" %% "play-json" % "2.5.3",
@@ -24,6 +24,6 @@ assemblyMergeStrategy in assembly := {
     oldStrategy(x)
 }
 
-assemblyOption in assembly := (assemblyOption in assembly).value.copy(prependShellScript = Some(Seq("#!/usr/bin/env sh", """exec java -jar "$0" "$@"""")))
+assemblyOption in assembly := (assemblyOption in assembly).value.copy(prependShellScript = Some(Seq("#!/usr/bin/env sh", """exec java -jar -Xmx4G "$0" "$@"""")))
 
 assemblyJarName in assembly := "las"

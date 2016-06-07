@@ -31,10 +31,10 @@ object LASCommandLineTool {
   lazy val compoundlas = new CompoundLexicalAnalysisService(combinedlas, snowballlas)
   
   object LanguageDetector extends LazyLogging {
-    val languageProfiles = new LanguageProfileReader().readAllBuiltIn()
-    val supportedLanguages = languageProfiles.map(_.getLocale.toString())
-    val detector = LanguageDetectorBuilder.create(NgramExtractors.standard()).withProfiles(languageProfiles).build()
-    val textObjectFactory = CommonTextObjectFactories.forDetectingOnLargeText()
+    lazy val languageProfiles = new LanguageProfileReader().readAllBuiltIn()
+    lazy val supportedLanguages = languageProfiles.map(_.getLocale.toString())
+    lazy val detector = LanguageDetectorBuilder.create(NgramExtractors.standard()).withProfiles(languageProfiles).build()
+    lazy val textObjectFactory = CommonTextObjectFactories.forDetectingOnLargeText()
     def apply(text: String) = detector.getProbabilities(textObjectFactory.forText(text))
   }
   
@@ -54,7 +54,7 @@ object LASCommandLineTool {
 
   def main(args: Array[String]) = {
     val parser = new scopt.OptionParser[Config]("las") {
-      head("las", "1.4.2")
+      head("las", "1.4.5")
       cmd("lemmatize") action { (_, c) =>
         c.copy(action = Action.Lemmatize)
       } text (s"(locales: ${compoundlas.getSupportedBaseformLocales.mkString(", ")})")
