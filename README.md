@@ -46,6 +46,8 @@ The LAS binary at https://github.com/jiemakel/las-cl/releases is actually a Java
 
 The memory allocation is necessary, as some of the transducers used by LAS are really quite huge (the biggest two some ~760 megabytes). This is also why the executable package is a whopping 400-900 megabytes (depending on release). This size also means that when running the program, initial loading will take a significant time (which you can test by running `las --help`). However, after that, processing will be fluent. This means that to optimally use the tool, you should pass LAS as much data in a single run as possible. LAS should be able to efficiently process both large files, as well as a large number of them. Another option is also to not give LAS a filename, whereby the tool will enter a a streaming mode, processing input line by line.
 
+When running on files, one should also select the appropriate `--process-by` mode. The default is to process by `file`, which is suitable for small files. However, if you have larger files, you should process either by `paragraph` (if you have such paragraphs, separated by two newlines) or by `line`, if you know sentences won't cross lines.
+
 ### Things to know when using LAS for analyzing Finnish
 
 While LAS supports many languages, the most complete support it has is for Finnish. However, this also makes the functionality complex. Thus, it is useful to delve deeper into what is actually happening.
