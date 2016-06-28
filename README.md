@@ -1,5 +1,5 @@
-# las-cl
-Lexical Analysis Command-Line Tool for lemmatizing, lexical analysis, inflected form generation and language identification of multiple languages.
+# Lexical Analysis Tool
+Lexical Analysis Command-Line Tool for lemmatizing, lexical analysis, inflected form generation, hyphenation and language identification of multiple languages.
 
 Program help:
 ```
@@ -38,7 +38,7 @@ identify language (locales: zh-TW, fi, no, hr, ta, ar, fr, is, lv, eu, mt, bn, d
         prints this usage text
 ```
 
-## Further information
+## Running
 
 The LAS binary at https://github.com/jiemakel/las-cl/releases is actually a Java JAR file, to which a tiny shell script has been prepended, running the JAR with an allocation of 4G of memory. You can however run the JAR also directly with other parameters yourself, e.g. `java -Xmx2G -jar las --help`.
 
@@ -48,7 +48,160 @@ The memory allocation is necessary, as some of the transducers used by LAS are r
 
 When running on files, one should also select the appropriate `--process-by` mode. The default is to process by `file`, which is suitable for small files. However, if you have larger files, you should process either by `paragraph` (if you have such paragraphs, separated by two newlines) or by `line`, if you know sentences won't cross lines.
 
-### Things to know when using LAS for analyzing Finnish
+## Functionalities
+
+The library is also exposed as a web service at http://demo.seco.tkk.fi/las/ . The documentation that follows is mostly equivalent to the one there, with the exception that http://demo.seco.tkk.fi/las/ has live examples where you can experiment with the different functionalities and inputs.
+
+### Language detection
+
+Tries to recognize the language of an input. In total, the language detection supports 78 locales, combining results from three sources:
+
+ * The [language-detector](https://github.com/optimaize/language-detector) library (locales `af, an, ar, ast, be, bg, bn, br, ca, cs, cy, da, de, el, en, es, et, eu, fa, fi, fr, ga, gl, gu, he, hi, hr, ht, hu, id, is, it, ja, km, kn, ko, lt, lv, mk, ml, mr, ms, mt, ne, nl, no, oc, pa, pl, pt, ro, ru, sk, sl, so, sq, sr, sv, sw, ta, te, th, tl, tr, uk, ur, vi, yi, zh-CN, zh-TW`),
+ * custom code based on the list of cues at the [Wikipedia language recognition chart](http://en.wikipedia.org/wiki/Wikipedia:Language_recognition_chart) (locales `cs, de, en, es, et, fi, fr, hu, it, pl, pt, ro, ru, sk, sv`), and
+ * finite state transducers provided by the [HFST](http://hfst.sourceforge.net/), [Omorfi](https://github.com/jiemakel/omorfi/) and [Giellatekno](http://giellatekno.uit.no/) projects (locales `de, en, fi, fr, it, la, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm`)
+
+Example:
+```
+Input: "The quick brown fox jumps over the lazy dog"
+Output: {
+  "locale" : "en",
+  "certainty" : 0.6803500000000001,
+  "details" : {
+    "languageRecognizerResults" : { "en" : 0.1973 },
+    "languageDetectorResults" : [ { "en" : 1.0 } ],
+    "hfstAcceptorResults" : [
+      { "en" : 0.84375 },
+      { "fi" : 0.09375 },
+      { "la" : 0.010416666666666666 },
+      { "tr" : 0.010416666666666666 },
+      { "sv" : 0.010416666666666666 },
+      { "sme" : 0.010416666666666666 },
+      { "it" : 0.010416666666666666 },
+      { "de" : 0.010416666666666666 }
+    ]
+  }
+}
+```
+
+### Lemmatization
+
+Lemmatizes the input into its base form. Uses finite state transducers provided by the [HFST](http://hfst.sourceforge.net/), [Omorfi](https://github.com/jiemakel/omorfi/) and [Giellatekno](http://giellatekno.uit.no/) projects where available (locales `de, en, fi, fr, it, la, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm`).
+Snowball stemmers are used for locales `dk, es, nl, no, pt, ru` (not used: `de, en, fi, fr, it, sv`)
+
+Note that the quality and scope of the lemmatization varies wildly between languages.
+
+```
+Input: "Albert osti fagotin ja töräytti puhkuvan melodian maakunnanvoudinvirastossa."
+Output: "Albert ostaa fagotti ja töräyttää puhkua melodia maakuntavoutivirasto ."
+```
+
+### Morphological analysis
+
+Gives a morphological analysis of the text. Uses finite state transducers provided by the provided by the [HFST](http://hfst.sourceforge.net/), [Omorfi](https://github.com/jiemakel/omorfi/) and [Giellatekno](http://giellatekno.uit.no/) projects.
+Supported locales: `de, en, fi, fr, it, la, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm`
+
+Note that the quality and scope of analysis as well as tags returned vary wildly between languages (and see below for Finnish specifically, which has the most support).
+
+Example:
+```
+Input: "Albert osti"
+Output:
+[ {
+  "word" : "Albert",
+  "analysis" : [ {
+    "weight" : 0.099609375,
+    "wordParts" : [ {
+      "lemma" : "Albert",
+      "tags" : {
+        "SEGMENT" : [ "Albert" ],
+        "KTN" : [ "5" ],
+        "UPOS" : [ "PROPN" ],
+        "NUM" : [ "SG" ],
+        "PROPER" : [ "LAST" ],
+        "CASE" : [ "NOM" ]
+      }
+    } ],
+    "globalTags" : {
+      "HEAD" : [ "2" ],
+      "DEPREL" : [ "punct" ],
+      "POS_MATCH" : [ "TRUE" ],
+      "BEST_MATCH" : [ "TRUE" ]
+    }
+  }, {
+    "weight" : 0.099609375,
+    "wordParts" : [ {
+      "lemma" : "Albert",
+      "tags" : {
+        "SEGMENT" : [ "Albert" ],
+        "KTN" : [ "5" ],
+        "UPOS" : [ "PROPN" ],
+        "NUM" : [ "SG" ],
+        "SEM" : [ "MALE" ],
+        "PROPER" : [ "FIRST" ],
+        "CASE" : [ "NOM" ]
+      }
+    } ],
+    "globalTags" : {
+      "HEAD" : [ "2" ],
+      "DEPREL" : [ "punct" ],
+      "POS_MATCH" : [ "TRUE" ],
+      "BEST_MATCH" : [ "TRUE" ]
+    }
+  } ]
+}, {
+  "word" : "osti",
+  "analysis" : [ {
+    "weight" : 0.099609375,
+    "wordParts" : [ {
+      "lemma" : "ostaa",
+      "tags" : {
+        "TENSE" : [ "PAST" ],
+        "SEGMENT" : [ "ost", "{MB}i" ],
+        "KTN" : [ "53" ],
+        "UPOS" : [ "VERB" ],
+        "MOOD" : [ "INDV" ],
+        "PERS" : [ "SG3" ],
+        "INFLECTED_FORM" : [ "V N Nom Sg" ],
+        "VOICE" : [ "ACT" ],
+        "INFLECTED" : [ "ostaminen" ]
+      }
+    } ],
+    "globalTags" : {
+      "HEAD" : [ "0" ],
+      "DEPREL" : [ "punct" ],
+      "POS_MATCH" : [ "TRUE" ],
+      "BEST_MATCH" : [ "TRUE" ]
+    }
+  } ]
+} ]
+```
+### Inflected form generation
+
+Transforms the text given a set of inflection forms (e.g. `V N Nom Sg, N Nom Pl, A Pos Nom Pl`), by default also converting words not matching the inflection forms to their base form.
+
+Uses finite state transducers provided by the provided by the [HFST](http://hfst.sourceforge.net/), [Omorfi](https://github.com/jiemakel/omorfi/) and [Giellatekno](http://giellatekno.uit.no/) projects. Note that the inflection form syntaxes differ wildly between languages.
+
+Supported locales: `de, en, fi, fr, it, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm`
+
+Example:
+```
+Input: "Albert osti fagotin ja töräytti puhkuvan melodian.", "V N Nom Sg, N Nom Pl, A Pos Nom Pl"
+Output: "Albert ostaminen fagotit ja töräyttäminen puhkuminen melodiat ."
+```
+
+### Hyphenation
+
+Hyphenates the given text. Uses finite state transducers provided by the provided by the [HFST](http://hfst.sourceforge.net/), [Omorfi](https://github.com/jiemakel/omorfi/) and [Giellatekno](http://giellatekno.uit.no/) projects. Those provided by HFST have been automatically translated from the TeX CTAN distribution's hyphenation rulesets.
+
+Supported locales: `bg, ca, cop, cs, cy, da, el, es, et, eu, fi, fr, ga, gl, hr, hsb, hu, ia, in, is, it, la, liv, mdf, mhr, mn, mrj, myv, nb, nl, nn, pl, pt, ro, ru, sa, sh, sk, sl, sme, sr, sv, tr, udm, uk, zh`
+
+Example:
+```
+Input: "Albert osti fagotin ja töräytti puhkuvan melodian."
+Output: "al-bert os-ti fa-go-tin ja tö-räyt-ti puh-ku-van me-lo-dian"
+```
+
+## Things to know when using LAS for analyzing Finnish
 
 While LAS supports many languages, the most complete support it has is for Finnish. However, this also makes the functionality complex. Thus, it is useful to delve deeper into what is actually happening.
 

@@ -1,0 +1,23 @@
+{
+  "@context": "https://raw.githubusercontent.com/mbjones/codemeta/master/codemeta.jsonld",
+  "@type": "Code",
+  "author": [
+    {
+      "@id": "http://orcid.org/0000-0002-8366-8414",
+      "@type": "Person",
+      "email": "eetu.makela@iki.fi",
+      "name": "Eetu Mäkelä",
+      "affiliation": "Aalto University"
+    }
+  ],
+  "identifier": "http://dx.doi.org/10.5281/zenodo.56576",
+  "codeRepository": "https://github.com/jiemakel/las-cl",
+  "datePublished": "2016-06-28",
+  "dateModified": "2016-06-28",
+  "dateCreated": "2016-06-28",
+  "description": "Lexical Analysis Command-Line Tool for lemmatizing, lexical analysis, inflected form generation and language identification of multiple languages.",
+  "keywords": "NLP, lexical analysis, morphological analysis, lemmatization, language identification",
+  "license": "MIT",
+  "title": "Lexical Analysis Tool",
+  "version": "v1.4.8"
+}
