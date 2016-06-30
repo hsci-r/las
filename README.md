@@ -1,5 +1,5 @@
 # Lexical Analysis Tool
-Lexical Analysis Command-Line Tool for lemmatizing, lexical analysis, inflected form generation, hyphenation and language identification of multiple languages.
+Language Analysis Command-Line Tool for lemmatizing, morphological analysis, inflected form generation, hyphenation and language identification of multiple languages.
 
 Program help:
 ```
@@ -86,7 +86,7 @@ Output: {
 ### Lemmatization
 
 Lemmatizes the input into its base form. Uses finite state transducers provided by the [HFST](http://hfst.sourceforge.net/), [Omorfi](https://github.com/jiemakel/omorfi/) and [Giellatekno](http://giellatekno.uit.no/) projects where available (locales `de, en, fi, fr, it, la, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm`).
-Snowball stemmers are used for locales `dk, es, nl, no, pt, ru` (not used: `de, en, fi, fr, it, sv`)
+[Snowball](http://snowballstem.org/) stemmers are used for locales `dk, es, nl, no, pt, ru` (not used: `de, en, fi, fr, it, sv`)
 
 Note that the quality and scope of the lemmatization varies wildly between languages.
 
