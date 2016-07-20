@@ -1,5 +1,9 @@
 # Lexical Analysis Tool
-Language Analysis Command-Line Tool for lemmatizing, morphological analysis, inflected form generation, hyphenation and language identification of multiple languages.
+Language Analysis Command-Line Tool for lemmatizing, morphological analysis, inflected form generation, hyphenation and language identification of multiple languages. 
+
+These functionalities are of use as part of many workflows requiring natural language processing. Indeed, LAS has been used for example as part of a pipeline for entity recognition, in creating a contextual reader for texts in English, Finnish and Latin, and for processing a Finnish historical newspaper collection in preparation for data publication.
+
+The tools backing these services are mostly not originally our own, but we've wrapped them for your convenience.
 
 Program help:
 ```
@@ -13,7 +17,7 @@ Command: analyze
 Command: inflect
 (locales: de, en, fi, fr, it, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm)
 Command: recognize
-report word recognition rate (locales: de, en, fi, fr, it, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm, la
+report word recognition rate (locales: de, en, fi, fr, it, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm, la)
 Command: identify
 identify language (locales: zh-TW, fi, no, hr, ta, ar, fr, is, lv, eu, mt, bn, dk, uk, pa, ga, br, so, pt, cs, fr, gl, sr, zh-CN, mrj, el, it, ca, vi, tl, nl, bg, ko, liv, it, mk, oc, et, af, de, ru, yi, cy, en, udm, ur, mdf, myv, sme, ru, ht, ml, th, id, sq, sv, de, sv, tr, da, en, gu, he, es, kn, sk, es, hi, te, mr, an, sw, be, pt, nl, ja, ast, fi, ro, mhr, ne, lt, no, km, sl, fa, ms, hu, pl, la, tr)
   --locale <value>
@@ -38,13 +42,13 @@ identify language (locales: zh-TW, fi, no, hr, ta, ar, fr, is, lv, eu, mt, bn, d
         prints this usage text
 ```
 
-## Running
+## Installation and running
 
-The LAS binary at https://github.com/jiemakel/las-cl/releases is actually a Java JAR file, to which a tiny shell script has been prepended, running the JAR with an allocation of 4G of memory. You can however run the JAR also directly with other parameters yourself, e.g. `java -Xmx2G -jar las --help`.
+The LAS binary at https://github.com/jiemakel/las-cl/releases is actually a Java JAR file, to which a tiny shell script has been prepended, running the JAR with an allocation of 4G of memory. Thus, on a UNIX system, after downloading the tool, it should be runnable itself. It may need to be set as executable first, though (e.g. `chmod 0755`). You can of course run the JAR also directly with other parameters yourself, e.g. `java -Xmx2G -jar las --help`.
 
 ### Optimal mode of running
 
-The memory allocation is necessary, as some of the transducers used by LAS are really quite huge (the biggest two some ~760 megabytes). This is also why the executable package is a whopping 400-900 megabytes (depending on release). This size also means that when running the program, initial loading will take a significant time (which you can test by running `las --help`). However, after that, processing will be fluent. This means that to optimally use the tool, you should pass LAS as much data in a single run as possible. LAS should be able to efficiently process both large files, as well as a large number of them. Another option is also to not give LAS a filename, whereby the tool will enter a a streaming mode, processing input line by line.
+The memory allocation is necessary, as some of the transducers used by LAS are really quite huge (the biggest two some ~760 megabytes). This is also why the executable package is a whopping 400-900 megabytes (depending on release). This size also means that each time running the program, initial startup will take a significant time (which you can test by running `las --help`). However, after that, processing will be fluent. This means that to optimally use the tool, you should pass LAS as much data in a single run as possible. LAS should be able to efficiently process both large files, as well as a large number of them. Another option is also to not give LAS a filename, whereby the tool will enter a a streaming mode, processing input line by line.
 
 When running on files, one should also select the appropriate `--process-by` mode. The default is to process by `file`, which is suitable for small files. However, if you have larger files, you should process either by `paragraph` (if you have such paragraphs, separated by two newlines) or by `line`, if you know sentences won't cross lines.
 
@@ -53,6 +57,8 @@ When running on files, one should also select the appropriate `--process-by` mod
 The library is also exposed as a web service at http://demo.seco.tkk.fi/las/ . The documentation that follows is mostly equivalent to the one there, with the exception that http://demo.seco.tkk.fi/las/ has live examples where you can experiment with the different functionalities and inputs.
 
 ### Language detection
+
+Run by ```las identify <files>``` to operate on files, or ```las identify``` for stream operation. If run on files, the output will be saved to files with the suffix of `.language` added to the filename.
 
 Tries to recognize the language of an input. In total, the language detection supports 78 locales, combining results from three sources:
 
@@ -85,10 +91,18 @@ Output: {
 
 ### Lemmatization
 
+Run by ```las lemmatize <files>``` to operate on files, or ```las lemmatize``` for stream operation. Add ``--locale [locale]`` to force a particular locale. If run on files, the output will be saved to files with the suffix of `.lemmatized` added to the filename.
+
 Lemmatizes the input into its base form. Uses finite state transducers provided by the [HFST](http://hfst.sourceforge.net/), [Omorfi](https://github.com/jiemakel/omorfi/) and [Giellatekno](http://giellatekno.uit.no/) projects where available (locales `de, en, fi, fr, it, la, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm`).
 [Snowball](http://snowballstem.org/) stemmers are used for locales `dk, es, nl, no, pt, ru` (not used: `de, en, fi, fr, it, sv`)
 
 Note that the quality and scope of the lemmatization varies wildly between languages.
+
+Examples:
+```
+Input: "Bobs letters about the missing money from the bank had created a huge kerfuffle"
+Output: "bob letter about the miss money from the bank have create a huge kerfuffle"
+```
 
 ```
 Input: "Albert osti fagotin ja töräytti puhkuvan melodian maakunnanvoudinvirastossa."
@@ -97,12 +111,47 @@ Output: "Albert ostaa fagotti ja töräyttää puhkua melodia maakuntavoutiviras
 
 ### Morphological analysis
 
+Run by ```las analyze <files>``` to operate on files, or ```las analyze``` for stream operation. Add ``--locale [locale]`` to force a particular locale. If run on files, the output will be saved to files with the suffix of `.analysis` added to the filename.
+
 Gives a morphological analysis of the text. Uses finite state transducers provided by the provided by the [HFST](http://hfst.sourceforge.net/), [Omorfi](https://github.com/jiemakel/omorfi/) and [Giellatekno](http://giellatekno.uit.no/) projects.
 Supported locales: `de, en, fi, fr, it, la, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm`
 
 Note that the quality and scope of analysis as well as tags returned vary wildly between languages (and see below for Finnish specifically, which has the most support).
 
 Example:
+```
+Input: "Bobs letters"
+Output:
+[ {
+  "word": "Bobs",
+  "analysis": [ {
+    "weight": 1,
+    "wordParts": [ {
+    "lemma": "bob",
+    "tags": {
+      "NN2-VVZ": [ "NN2-VVZ" ]
+    } ],
+    "globalTags": {
+      "BEST_MATCH": [ "TRUE" ]
+    }
+  } ]
+}, {
+  "word": "letters",
+  "analysis": [ {
+    "weight": 1,
+    "wordParts": [ {
+      "lemma": "letter",
+      "tags": {
+        "NN2": [ "NN2" ]
+      }
+    } ],
+    "globalTags": {
+      "BEST_MATCH": [ "TRUE" ]
+    }
+  } ]
+} ]
+```
+
 ```
 Input: "Albert osti"
 Output:
@@ -175,30 +224,77 @@ Output:
   } ]
 } ]
 ```
+
 ### Inflected form generation
 
-Transforms the text given a set of inflection forms (e.g. `V N Nom Sg, N Nom Pl, A Pos Nom Pl`), by default also converting words not matching the inflection forms to their base form.
+Run by ```las inflect <files> --forms <forms>``` to operate on files, or ```las inflect  --forms <forms>``` for stream operation. Add ``--locale [locale]`` to force a particular locale. If run on files, the output will be saved to files with the suffix of `.inflected` added to the filename.
 
-Uses finite state transducers provided by the provided by the [HFST](http://hfst.sourceforge.net/), [Omorfi](https://github.com/jiemakel/omorfi/) and [Giellatekno](http://giellatekno.uit.no/) projects. Note that the inflection form syntaxes differ wildly between languages.
+Transforms the text given a set of inflection forms (e.g. `V N Nom Sg, N Nom Pl, A Pos Nom Pl`), by default also converting words not matching the inflection forms to their base form. This may be useful for example as a pre-processing step when matching text against a vocabulary that has words in it in e.g. plural form.
+
+Uses finite state transducers provided by the provided by the [HFST](http://hfst.sourceforge.net/), [Omorfi](https://github.com/jiemakel/omorfi/) and [Giellatekno](http://giellatekno.uit.no/) projects. Note that the inflection form syntaxes differ wildly between languages (in practice, it's often easiest to run analysis on an inflected form to discover how to recreate that form).
 
 Supported locales: `de, en, fi, fr, it, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm`
 
-Example:
+Examples:
+```
+Input: "Bobs letter about the missing money from the bank creates a large kerfuffle", "NN2,VVN,AJS"
+Output: "bobs letters about thes misses moneys from thes banks CREATED As largest kerfuffle"
+```
+
 ```
 Input: "Albert osti fagotin ja töräytti puhkuvan melodian.", "V N Nom Sg, N Nom Pl, A Pos Nom Pl"
 Output: "Albert ostaminen fagotit ja töräyttäminen puhkuminen melodiat ."
 ```
 
+### Word recognition rate reporting
+
+Run by ```las recognize <files>``` to operate on files, or ```las recognize``` for stream operation. Add ``--locale [locale]`` to force a particular locale. If run on files, the output will be saved to files with the suffix of `.recognition` added to the filename.
+
+Report the number of words a particular language processor recognizes. This may be useful for e.g. estimating the number of OCR errors in automatically scanned historical newspapers.
+
+Supported locales: `de, en, fi, fr, it, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm, la`
+
+Examples:
+```
+Input: "?l»vatcssaan Satakunnan maanwiljelystotoukscu, joka pidettiin Kautuau tehtaalla Euran pitäjässä"
+Output:
+{
+  "locale" : "fi",
+  "recognized" : 7,
+  "unrecognized" : 3,
+  "rate" : 0.7
+}
+```
+
+```
+Input: "B»bs letters about the missiing money from the bank had created a huge kerfussle"
+Output:
+{
+  "locale" : "en",
+  "recognized" : 11,
+  "unrecognized" : 3,
+  "rate" : 0.7857142857142857
+}
+```
+
+
 ### Hyphenation
+
+Run by ```las hyphenate <files>``` to operate on files, or ```las hyphenate``` for stream operation. Add ``--locale [locale]`` to force a particular locale. If run on files, the output will be saved to files with the suffix of `.hyphenated` added to the filename.
 
 Hyphenates the given text. Uses finite state transducers provided by the provided by the [HFST](http://hfst.sourceforge.net/), [Omorfi](https://github.com/jiemakel/omorfi/) and [Giellatekno](http://giellatekno.uit.no/) projects. Those provided by HFST have been automatically translated from the TeX CTAN distribution's hyphenation rulesets.
 
 Supported locales: `bg, ca, cop, cs, cy, da, el, es, et, eu, fi, fr, ga, gl, hr, hsb, hu, ia, in, is, it, la, liv, mdf, mhr, mn, mrj, myv, nb, nl, nn, pl, pt, ro, ru, sa, sh, sk, sl, sme, sr, sv, tr, udm, uk, zh`
 
-Example:
+Examples:
 ```
 Input: "Albert osti fagotin ja töräytti puhkuvan melodian."
 Output: "al-bert os-ti fa-go-tin ja tö-räyt-ti puh-ku-van me-lo-dian"
+```
+
+```
+Input: "Månens yta består i stora drag av två olika typer av landskap"
+Output: "må-nens y-ta be-står i sto-ra d-rag av två o-li-ka ty-per av lan-d-skap"
 ```
 
 ## Things to know when using LAS for analyzing Finnish
