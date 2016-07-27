@@ -1,4 +1,4 @@
-# Lexical Analysis Tool
+# Language Analysis Tool
 Language Analysis Command-Line Tool for lemmatizing, morphological analysis, inflected form generation, hyphenation and language identification of multiple languages. 
 
 These functionalities are of use as part of many workflows requiring natural language processing. Indeed, LAS has been used for example as part of a pipeline for entity recognition, in creating a contextual reader for texts in English, Finnish and Latin, and for processing a Finnish historical newspaper collection in preparation for data publication.
@@ -328,3 +328,7 @@ To this baseline, the functionality in LAS (or the modified Omorfi) adds:
   * `twiittasin` -> `tviitata`, (guessed, `twiittasin` for `--no-guess`)
   * `Leh>tim»ehen` -> `Lehtimies` for `--max-edit-distance 2`
   * `Helsingin` -> `Helsinki` (instead of the last name `Helsing`, based on Wikipedia frequency)
+
+## Contributing
+
+If you encounter problems, open an issue in GitHub. Pull requests also naturally welcome. If you wish to delve deeper into how the tool works, be aware that this repository contains just one of two front ends. Many more lines of code are contained in the [seco-lexicalanalysis](https://github.com/jiemakel/seco-lexicalanalysis/) repository, which contains the code common to this command line version and the [web service](http://demo.seco.tkk.fi/las/) version ([seco-lexicalanalysis-play](https://github.com/jiemakel/seco-lexicalanalysis/)). They in turn refer to [seco-hfst](https://github.com/jiemakel/seco-hfst/). In addition, the in-depth work on integrating and expanding the Finnish pipeline included in the tool builds heavily on our [omorfi fork](https://github.com/jiemakel/omorfi).
