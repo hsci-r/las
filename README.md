@@ -1,4 +1,7 @@
 # Language Analysis Tool
+
+[![DOI](https://zenodo.org/badge/32348123.svg)](https://zenodo.org/badge/latestdoi/32348123)
+
 Language Analysis Command-Line Tool for lemmatizing, morphological analysis, inflected form generation, hyphenation and language identification of multiple languages. 
 
 These functionalities are of use as part of many workflows requiring natural language processing. Indeed, LAS has been used for example as part of a pipeline for entity recognition, in creating a contextual reader for texts in English, Finnish and Latin, and for processing a Finnish historical newspaper collection in preparation for data publication.
