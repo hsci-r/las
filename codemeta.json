@@ -10,10 +10,10 @@
       "affiliation": "Aalto University"
     }
   ],
-  "identifier": "http://dx.doi.org/10.5281/zenodo.56576",
+  "identifier": "http://dx.doi.org/10.5281/zenodo.160256",
   "codeRepository": "https://github.com/jiemakel/las",
-  "datePublished": "2016-06-28",
-  "dateModified": "2016-06-28",
+  "datePublished": "2016-10-12",
+  "dateModified": "2016-10-12",
   "dateCreated": "2016-06-28",
   "description": "Lexical Analysis Command-Line Tool for lemmatizing, lexical analysis, inflected form generation and language identification of multiple languages.",
   "keywords": "NLP, lexical analysis, morphological analysis, lemmatization, language identification",
