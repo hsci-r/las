@@ -44,7 +44,7 @@ identify language (locales: zh-TW, fi, no, hr, ta, ar, fr, is, lv, eu, mt, bn, d
 
 ## Installation and running
 
-The LAS binary at https://github.com/jiemakel/las-cl/releases is actually a Java JAR file, to which a tiny shell script has been prepended, running the JAR with an allocation of 4G of memory. Thus, on a UNIX system, after downloading the tool, it should be runnable itself. It may need to be set as executable first, though (e.g. `chmod 0755`). You can of course run the JAR also directly with other parameters yourself, e.g. `java -Xmx2G -jar las --help`.
+The LAS binary at https://github.com/jiemakel/las/releases is actually a Java JAR file, to which a tiny shell script has been prepended, running the JAR with an allocation of 4G of memory. Thus, on a UNIX system, after downloading the tool, it should be runnable itself. It may need to be set as executable first, though (e.g. `chmod 0755`). You can of course run the JAR also directly with other parameters yourself, e.g. `java -Xmx2G -jar las --help`.
 
 ### Optimal mode of running
 

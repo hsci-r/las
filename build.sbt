@@ -1,4 +1,4 @@
-name := """las-cl"""
+name := """las"""
 
 version := "1.4.8"
 
