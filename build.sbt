@@ -5,7 +5,7 @@ version := "1.4.9"
 scalaVersion := "2.11.8"
 
 libraryDependencies ++= Seq(
-    "fi.seco" % "lexicalanalysis" % "1.4.9",
+    "fi.seco" % "lexicalanalysis" % "1.5.1",
     "com.optimaize.languagedetector" % "language-detector" % "0.5",
     "com.github.scopt" %% "scopt" % "3.4.0",
     "com.typesafe.play" %% "play-json" % "2.5.3",
