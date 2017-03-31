@@ -54,7 +54,7 @@ object LASCommandLineTool {
 
   def main(args: Array[String]) = {
     val parser = new scopt.OptionParser[Config]("las") {
-      head("las", "1.5.4")
+      head("las", "1.5.5")
       cmd("lemmatize") action { (_, c) =>
         c.copy(action = Action.Lemmatize)
       } text (s"(locales: ${compoundlas.getSupportedBaseformLocales.mkString(", ")})")
