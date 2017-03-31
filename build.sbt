@@ -1,11 +1,11 @@
 name := """las"""
 
-version := "1.5.3"
+version := "1.5.4"
 
 scalaVersion := "2.11.8"
 
 libraryDependencies ++= Seq(
-    "fi.seco" % "lexicalanalysis" % "1.5.3",
+    "fi.seco" % "lexicalanalysis" % "1.5.4",
     "com.optimaize.languagedetector" % "language-detector" % "0.5",
     "com.github.scopt" %% "scopt" % "3.4.0",
     "com.typesafe.play" %% "play-json" % "2.5.3",
