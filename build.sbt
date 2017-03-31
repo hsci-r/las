@@ -2,15 +2,15 @@ name := """las"""
 
 version := "1.5.4"
 
-scalaVersion := "2.11.8"
+scalaVersion := "2.12.1"
 
 libraryDependencies ++= Seq(
     "fi.seco" % "lexicalanalysis" % "1.5.4",
-    "com.optimaize.languagedetector" % "language-detector" % "0.5",
-    "com.github.scopt" %% "scopt" % "3.4.0",
-    "com.typesafe.play" %% "play-json" % "2.5.3",
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0",
-    "ch.qos.logback" % "logback-classic" % "1.1.7" % "runtime"
+    "com.optimaize.languagedetector" % "language-detector" % "0.6",
+    "com.github.scopt" %% "scopt" % "3.5.0",
+    "com.typesafe.play" %% "play-json" % "2.6.0-M3",
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
+    "ch.qos.logback" % "logback-classic" % "1.2.2" % "runtime"
 )
 resolvers ++= Seq(
     "Local Maven Repository" at Path.userHome.asFile.toURI.toURL + ".m2/repository")
