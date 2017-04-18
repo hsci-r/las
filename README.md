@@ -1,6 +1,6 @@
 # Language Analysis Tool
 
-[![DOI](https://zenodo.org/badge/32348123.svg)](https://zenodo.org/badge/latestdoi/32348123)
+Cite as: [![JOSS](http://joss.theoj.org/papers/10.21105/joss.00035/status.svg)](http://dx.doi.org/10.21105/joss.00035)
 
 Language Analysis Command-Line Tool for lemmatizing, morphological analysis, inflected form generation, hyphenation and language identification of multiple languages. 
 
