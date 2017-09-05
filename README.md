@@ -10,7 +10,7 @@ The tools backing these services are mostly not originally our own, but we've wr
 
 Program help:
 ```
-las 1.4.8
+las 1.5.9
 Usage: las [lemmatize|analyze|inflect|recognize|identify] [options] [<file>...]
 
 Command: lemmatize
@@ -20,29 +20,22 @@ Command: analyze
 Command: inflect
 (locales: de, en, fi, fr, it, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm)
 Command: recognize
-report word recognition rate (locales: de, en, fi, fr, it, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm, la)
+report word recognition rate (locales: de, en, fi, fr, it, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm, la
 Command: identify
 identify language (locales: zh-TW, fi, no, hr, ta, ar, fr, is, lv, eu, mt, bn, dk, uk, pa, ga, br, so, pt, cs, fr, gl, sr, zh-CN, mrj, el, it, ca, vi, tl, nl, bg, ko, liv, it, mk, oc, et, af, de, ru, yi, cy, en, udm, ur, mdf, myv, sme, ru, ht, ml, th, id, sq, sv, de, sv, tr, da, en, gu, he, es, kn, sk, es, hi, te, mr, an, sw, be, pt, nl, ja, ast, fi, ro, mhr, ne, lt, no, km, sl, fa, ms, hu, pl, la, tr)
-  --locale <value>
-        possible locales
-  --forms <value>
-        inclection forms for inflect/analyze
-  --segment
-        segment baseforms?
-  --no-guess
-        Don't guess baseforms for unknown words?
-  --no-segment-guessed
-        Don't guess segmentation information for guessed words (speeds up processing significantly)?
-  --process-by <value>
-        Analysis unit when processing files (file, paragraph, line)?
+  --locale <value>         possible locales
+  --forms <value>          inclection forms for inflect/analyze
+  --segment                segment baseforms?
+  --no-guess               Don't guess baseforms for unknown words?
+  --no-segment-guessed     Don't guess segmentation information for guessed words (speeds up processing significantly)?
+  --process-by <value>     Analysis unit when processing files (file, paragraph, line) (default=paragraph)?
+  --depth <value>          Analysis depth (0-2, 1=apply machine learned best analysis guessing, 2=include dependency analysis in output) (default 1)?
   --max-edit-distance <value>
-        Maximum edit distance for error-correcting unidentified words (default 0)?
-  --no-pretty
-        Don't pretty print json?
-  <file>...
-        files to process (stdin if not given)
-  --help
-        prints this usage text
+                           Maximum edit distance for error-correcting unidentified words (default 0)?
+  --no-pretty              Don't pretty print json?
+  <file>...                files to process (stdin if not given)
+  --help                   prints this usage text
+
 ```
 
 ## Installation and running
