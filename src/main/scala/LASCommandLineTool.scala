@@ -50,7 +50,7 @@ object LASCommandLineTool {
 
   implicit val actionRead: scopt.Read[Action.Value] = scopt.Read.reads(Action withName _)
 
-  case class Config(action: Action.Action = null, locale: Seq[String] = Seq(), forms: Seq[String] = Seq(), segmentBaseforms: Boolean = false, processBy: ProcessBy.ProcessBy = ProcessBy.File, guess: Boolean = true, segmentGuessed: Boolean = true, maxEditDistance: Int = 0, pretty: Boolean = true, files: Seq[String] = Seq())
+  case class Config(action: Action.Action = null, locale: Seq[String] = Seq(), forms: Seq[String] = Seq(), segmentBaseforms: Boolean = false, processBy: ProcessBy.ProcessBy = ProcessBy.Paragraph, guess: Boolean = true, segmentGuessed: Boolean = true, maxEditDistance: Int = 0, depth: Int = 1, pretty: Boolean = true, files: Seq[String] = Seq())
 
   def main(args: Array[String]) = {
     val parser = new scopt.OptionParser[Config]("las") {
@@ -87,7 +87,10 @@ object LASCommandLineTool {
       } text ("Don't guess segmentation information for guessed words (speeds up processing significantly)?")
       opt[String]("process-by") action { (x, c) =>
         c.copy(processBy = ProcessBy.withName(x.charAt(0).toUpper + x.substring(1).toLowerCase))
-      } text ("Analysis unit when processing files (file, paragraph, line)?")
+      } text ("Analysis unit when processing files (file, paragraph, line) (default=paragraph)?")
+      opt[Int]("depth") action { (x, c) =>
+        c.copy(depth = x)
+      } text ("Analysis depth (0-2, 1=apply machine learned best analysis guessing, 2=include dependency analysis in output) (default 1)?")
       opt[Int]("max-edit-distance") action { (x, c) =>
         c.copy(maxEditDistance = x)
       } text ("Maximum edit distance for error-correcting unidentified words (default 0)?")
@@ -138,7 +141,7 @@ object LASCommandLineTool {
             var i = 0
             if (config.processBy!=ProcessBy.File) writer.write('[')
             for (paragraph <- paragraphs) {
-              val analysis = analyze(paragraph, config.locale,config.forms,config.segmentBaseforms,config.guess,config.segmentGuessed,config.maxEditDistance,config.pretty).getOrElse("{}")
+              val analysis = analyze(paragraph, config.locale,config.forms,config.segmentBaseforms,config.guess,config.segmentGuessed,config.maxEditDistance,config.depth,config.pretty).getOrElse("{}")
               writer.write(analysis)
               i += 1
               if (i!=paragraphs.length) {
@@ -151,7 +154,7 @@ object LASCommandLineTool {
           } else {
             var text = StdIn.readLine()
             while (text != null) {
-              println(analyze(text, config.locale,config.forms,config.segmentBaseforms,config.guess,config.segmentGuessed,config.maxEditDistance,config.pretty).getOrElse("?"));
+              println(analyze(text, config.locale,config.forms,config.segmentBaseforms,config.guess,config.segmentGuessed,config.maxEditDistance,config.depth,config.pretty).getOrElse("?"));
               text = StdIn.readLine()
             }
           }
@@ -277,10 +280,10 @@ object LASCommandLineTool {
     }
   }
 
-  def analyze(text: String, locales: Seq[String],forms:Seq[String], segments:Boolean, guess:Boolean, segmentGuessed:Boolean, maxEditDistance: Int, pretty:Boolean): Option[String] = {
+  def analyze(text: String, locales: Seq[String],forms:Seq[String], segments:Boolean, guess:Boolean, segmentGuessed:Boolean, maxEditDistance: Int, depth: Int, pretty:Boolean): Option[String] = {
     (if (locales.length==1) Some(locales(0)) else getBestLang(text, if (locales.isEmpty) combinedlas.getSupportedAnalyzeLocales.toSeq.map(_.toString) else locales)) match {
       case Some(lang) => 
-        val analysis = Json.toJson(combinedlas.analyze(text, new Locale(lang),forms,segments,guess,segmentGuessed,maxEditDistance).toList)
+        val analysis = Json.toJson(combinedlas.analyze(text, new Locale(lang),forms,segments,guess,segmentGuessed,maxEditDistance, depth).toList)
         if (pretty) {
           if (locales.isEmpty) Some(Json.prettyPrint(Json.toJson(Map("locale" -> Json.toJson(lang), "analysis" -> analysis))))
           else Some(Json.prettyPrint(analysis))

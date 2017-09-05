@@ -2,10 +2,10 @@ name := """las"""
 
 version := "1.5.9"
 
-scalaVersion := "2.12.1"
+scalaVersion := "2.12.3"
 
 libraryDependencies ++= Seq(
-    "fi.seco" % "lexicalanalysis" % "1.5.9",
+    "fi.seco" % "lexicalanalysis" % "1.5.11",
     "com.optimaize.languagedetector" % "language-detector" % "0.6",
     "com.github.scopt" %% "scopt" % "3.5.0",
     "com.typesafe.play" %% "play-json" % "2.6.0-M3",
@@ -24,6 +24,6 @@ assemblyMergeStrategy in assembly := {
     oldStrategy(x)
 }
 
-assemblyOption in assembly := (assemblyOption in assembly).value.copy(prependShellScript = Some(Seq("#!/usr/bin/env sh", """exec java -jar -Xmx4G "$0" "$@"""")))
+assemblyOption in assembly := (assemblyOption in assembly).value.copy(prependShellScript = Some(Seq("#!/usr/bin/env sh", """exec java -jar -Xmx4G "$0" "$@"""" + "\n")))
 
 assemblyJarName in assembly := "las"
