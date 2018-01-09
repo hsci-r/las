@@ -1,31 +1,24 @@
-import fi.seco.lexical.hfst.HFSTLexicalAnalysisService
-import fi.seco.lexical.combined.CombinedLexicalAnalysisService
-import fi.seco.lexical.SnowballLexicalAnalysisService
-import fi.seco.lexical.CompoundLexicalAnalysisService
-import com.typesafe.scalalogging.LazyLogging
-import fi.seco.lexical.LanguageRecognizer
-import scala.collection.convert.WrapAsScala._
-import scala.collection.convert.WrapAsJava._
-import scala.util.Try
+import java.io.{File, PrintWriter}
 import java.util.Locale
-import java.util.HashMap
-import java.io.File
-import scala.io.StdIn
-import scala.io.Source
-import java.io.PrintWriter
-import play.api.libs.json.JsValue
-import play.api.libs.json.Json
-import fi.seco.lexical.hfst.HFSTLexicalAnalysisService.WordToResults
-import play.api.libs.json.Writes
-import java.util.Collections
+
 import com.optimaize.langdetect.LanguageDetectorBuilder
 import com.optimaize.langdetect.ngram.NgramExtractors
 import com.optimaize.langdetect.profiles.LanguageProfileReader
 import com.optimaize.langdetect.text.CommonTextObjectFactories
+import com.typesafe.scalalogging.LazyLogging
+import fi.seco.lexical.{CompoundLexicalAnalysisService, LanguageRecognizer, SnowballLexicalAnalysisService}
+import fi.seco.lexical.combined.CombinedLexicalAnalysisService
+import fi.seco.lexical.hfst.HFSTLexicalAnalysisService
+import fi.seco.lexical.hfst.HFSTLexicalAnalysisService.WordToResults
+import play.api.libs.json.{JsValue, Json, Writes}
+
+import scala.collection.convert.WrapAsJava._
+import scala.collection.convert.WrapAsScala._
+import scala.io.{Source, StdIn}
+import scala.util.Try
 
 object LASCommandLineTool {
 
-  lazy val hfstlas = new HFSTLexicalAnalysisService
   lazy val combinedlas = new CombinedLexicalAnalysisService
   lazy val snowballlas = new SnowballLexicalAnalysisService
   lazy val compoundlas = new CompoundLexicalAnalysisService(combinedlas, snowballlas)
@@ -45,7 +38,7 @@ object LASCommandLineTool {
    
   object Action extends Enumeration {
     type Action = Value
-    val Inflect, Lemmatize, Analyze, Detect, Recognize = Value
+    val Inflect, Lemmatize, Analyze, Detect, Recognize, Hyphenate = Value
   }
 
   implicit val actionRead: scopt.Read[Action.Value] = scopt.Read.reads(Action withName _)
@@ -54,7 +47,7 @@ object LASCommandLineTool {
 
   def main(args: Array[String]) = {
     val parser = new scopt.OptionParser[Config]("las") {
-      head("las", "1.5.9")
+      head("las", "1.5.13")
       cmd("lemmatize") action { (_, c) =>
         c.copy(action = Action.Lemmatize)
       } text (s"(locales: ${compoundlas.getSupportedBaseformLocales.mkString(", ")})")
@@ -66,10 +59,13 @@ object LASCommandLineTool {
       } text (s"(locales: ${combinedlas.getSupportedInflectionLocales.mkString(", ")})")
       cmd("recognize") action { (_, c) =>
         c.copy(action = Action.Recognize)
-      } text (s"report word recognition rate (locales: ${combinedlas.getSupportedAnalyzeLocales.mkString(", ")}")
+      } text (s"report word recognition rate (locales: ${combinedlas.getSupportedAnalyzeLocales.mkString(", ")})")
       cmd("identify") action { (_, c) =>
         c.copy(action = Action.Detect)
       } text (s"identify language (locales: ${(LanguageRecognizer.getAvailableLanguages ++ LanguageDetector.supportedLanguages ++ compoundlas.getSupportedBaseformLocales).toSet.mkString(", ")})")
+      cmd("hyphenate") action { (_, c) =>
+        c.copy(action = Action.Hyphenate)
+      } text (s"hyphenate (locales: ${combinedlas.getSupportedHyphenationLocales.mkString(", ")})")
       opt[Seq[String]]("locale") optional () action { (x, c) =>
         c.copy(locale = x)
       } text ("possible locales")
@@ -95,18 +91,43 @@ object LASCommandLineTool {
         c.copy(maxEditDistance = x)
       } text ("Maximum edit distance for error-correcting unidentified words (default 0)?")
       opt[Unit]("no-pretty") action { (_, c) =>
-        c.copy(pretty = true)
+        c.copy(pretty = false)
       } text ("Don't pretty print json?")
       arg[String]("<file>...") unbounded () optional () action { (x, c) =>
         c.copy(files = c.files :+ x)
       } text ("files to process (stdin if not given)")
       help("help") text("prints this usage text")
-      checkConfig { c => if (c.action==null) failure("specify at least an action (lemmatize, analyze, inflect or identify)") else success }
+      checkConfig { c => if (c.action==null) failure("specify at least an action (lemmatize, analyze, inflect, recognize, identify or hyphenate)") else success }
     }
     // parser.parse returns Option[C]
     parser.parse(args, Config()) match {
       case Some(config) =>
         config.action match {
+          case Action.Hyphenate => if (!config.files.isEmpty) for (file <- config.files) {
+            val writer = new PrintWriter(new File(file+".hyphenated"))
+            val paragraphs = config.processBy match {
+              case ProcessBy.File => Seq(Source.fromFile(file).mkString)
+              case ProcessBy.Paragraph => Source.fromFile(file).mkString.split("\\s*\n\\s*\n").toSeq
+              case ProcessBy.Line => Source.fromFile(file).mkString.split("\n").toSeq
+            }
+            var i = 0
+            for (paragraph <- paragraphs) {
+              val hyphenated = hyphenate(paragraph, config.locale).getOrElse(paragraph)
+              writer.write(hyphenated)
+              i += 1
+              if (i!=paragraphs.length) {
+                writer.write("\n")
+                if (config.processBy == ProcessBy.Paragraph) writer.write("\n")
+              }
+            }
+            writer.close()
+          } else {
+            var text = StdIn.readLine()
+            while (text != null) {
+              println(hyphenate(text, config.locale).getOrElse(text));
+              text = StdIn.readLine()
+            }
+          }
           case Action.Lemmatize => if (!config.files.isEmpty) for (file <- config.files) {
             val writer = new PrintWriter(new File(file+".lemmatized"))
             val paragraphs = config.processBy match {
@@ -122,7 +143,8 @@ object LASCommandLineTool {
               if (i!=paragraphs.length) {
                 writer.write("\n")
                 if (config.processBy == ProcessBy.Paragraph) writer.write("\n")
-              }            }
+              }
+            }
             writer.close()
           } else {
             var text = StdIn.readLine()
@@ -251,8 +273,19 @@ object LASCommandLineTool {
       case None       => None
     }
   }
-  
-    implicit val WordPartWrites = new Writes[HFSTLexicalAnalysisService.Result.WordPart] {
+
+  def hyphenate(text: String, locales: Seq[String]): Option[String] = {
+    (if (locales.length==1) Some(locales(0)) else getBestLang(text, if (locales.isEmpty) compoundlas.getSupportedBaseformLocales.toSeq.map(_.toString) else locales)) match {
+      case Some(lang) =>
+        val hyphenated = compoundlas.hyphenate(text, new Locale(lang))
+        if (locales.isEmpty) Some(Json.toJson(Map("locale" -> lang, "hyphenated" -> hyphenated)).toString())
+        else Some(hyphenated)
+      case None       => None
+    }
+  }
+
+
+  implicit val WordPartWrites = new Writes[HFSTLexicalAnalysisService.Result.WordPart] {
     def writes(r : HFSTLexicalAnalysisService.Result.WordPart) : JsValue = {
       Json.obj(
         "lemma" -> r.getLemma,
@@ -322,16 +355,16 @@ object LASCommandLineTool {
     if (locales.isEmpty) {
       val lrResult = Option(LanguageRecognizer.getLanguageAsObject(text)).map(r => Map(r.getLang() -> r.getIndex))
       val ldResult = Try(LanguageDetector(text).map(l => Map(l.getLocale.toString -> l.getProbability))).getOrElse(Seq.empty)
-      val hfstResultTmp = hfstlas.getSupportedAnalyzeLocales.map(lang =>
-            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
+      val hfstResultTmp = combinedlas.getSupportedAnalyzeLocales.map(lang =>
+            (lang.toString(),combinedlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
       val hfstResult = hfstResultTmp.map(p => Map(p._1 -> p._2 / tc))
       Try(Some((ldResult ++ hfstResult ++ lrResult).groupBy(_.keysIterator.next).mapValues(_.foldRight(0.0) { (p, r) => r + p.valuesIterator.next } / 3.0).maxBy(_._2)._1)).getOrElse(None)
     } else {
       val lrResult = Option(LanguageRecognizer.getLanguageAsObject(text, locales: _*)).map(r => Map(r.getLang() -> r.getIndex))
       val ldResult = Try(LanguageDetector(text).filter(d => locales.contains(d.getLocale.toString)).map(l => Map(l.getLocale.toString -> l.getProbability))).getOrElse(Seq.empty)
-      val hfstResultTmp = locales.map(new Locale(_)).intersect(hfstlas.getSupportedAnalyzeLocales.toSeq).map(lang =>
-            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
+      val hfstResultTmp = locales.map(new Locale(_)).intersect(combinedlas.getSupportedAnalyzeLocales.toSeq).map(lang =>
+            (lang.toString(),combinedlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
       val hfstResult = hfstResultTmp.map(p => Map(p._1 -> p._2 / tc))
       Try(Some((ldResult ++ hfstResult ++ lrResult).groupBy(_.keysIterator.next).mapValues(_.foldRight(0.0) { (p, r) => r + p.valuesIterator.next } / 3.0).maxBy(_._2)._1)).getOrElse(None)
@@ -342,8 +375,8 @@ object LASCommandLineTool {
     val ret = if (!locales.isEmpty) {
       val lrResult = Option(LanguageRecognizer.getLanguageAsObject(text, locales: _*)).map(r => Map(r.getLang() -> r.getIndex))
       val ldResult = Try(LanguageDetector(text).filter(d => locales.contains(d.getLocale.toString)).map(l => Map(l.getLocale.toString -> l.getProbability))).getOrElse(Seq.empty)
-      val hfstResultTmp = locales.map(new Locale(_)).intersect(hfstlas.getSupportedAnalyzeLocales.toSeq).map(lang =>
-            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
+      val hfstResultTmp = locales.map(new Locale(_)).intersect(combinedlas.getSupportedAnalyzeLocales.toSeq).map(lang =>
+            (lang.toString(),combinedlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
       val hfstResult = hfstResultTmp.map(p => Map(p._1 -> p._2 / tc))
       val bestGuess = Try(Some((ldResult ++ hfstResult ++ lrResult).groupBy(_.keysIterator.next).mapValues(_.foldRight(0.0) { (p, r) => r + p.valuesIterator.next } / 3.0).maxBy(_._2))).getOrElse(None)
@@ -354,8 +387,8 @@ object LASCommandLineTool {
     } else {
       val lrResult = Option(LanguageRecognizer.getLanguageAsObject(text)).map(r => Map(r.getLang() -> r.getIndex))
       val ldResult = Try(LanguageDetector(text).map(l => Map(l.getLocale.toString -> l.getProbability))).getOrElse(Seq.empty)
-      val hfstResultTmp = hfstlas.getSupportedAnalyzeLocales.map(lang =>
-            (lang.toString(),hfstlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
+      val hfstResultTmp = combinedlas.getSupportedAnalyzeLocales.map(lang =>
+            (lang.toString(),combinedlas.recognize(text, lang))).filter(_._2.getRate!=0.0).toSeq.sortBy(_._2.getRate).reverse.map(p => (p._1,p._2.getRate*p._2.getRate))
       val tc = hfstResultTmp.foldRight(0.0) { _._2 + _ }
       val hfstResult = hfstResultTmp.map(p => Map(p._1 -> p._2 / tc))
       val bestGuess = Try(Some((ldResult ++ hfstResult ++ lrResult).groupBy(_.keysIterator.next).mapValues(_.foldRight(0.0) { (p, r) => r + p.valuesIterator.next } / 3.0).maxBy(_._2))).getOrElse(None)

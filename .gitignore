@@ -5,6 +5,8 @@
 /project/target/
 /target/
 /bin/
+/build/
+/dist/
 /.cache
 /.classpath
 /.project
