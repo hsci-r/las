@@ -10,21 +10,23 @@ The tools backing these services are mostly not originally our own, but we've wr
 
 Program help:
 ```
-las 1.5.9
-Usage: las [lemmatize|analyze|inflect|recognize|identify] [options] [<file>...]
+las 1.5.13
+Usage: las [lemmatize|analyze|inflect|recognize|identify|hyphenate] [options] [<file>...]
 
 Command: lemmatize
-(locales: pt, mhr, fr, ru, myv, dk, it, mrj, liv, de, fi, es, tr, la, en, sv, udm, nl, mdf, sme, no)
+(locales: pt, mhr, fr, ru, myv, dk, it, mrj, liv, fi, de, es, tr, la, en, sv, udm, nl, mdf, sme, no)
 Command: analyze
-(locales: de, en, fi, fr, it, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm, la)
+(locales: mhr, fr, myv, it, mrj, liv, fi, de, tr, la, en, sv, udm, mdf, sme)
 Command: inflect
-(locales: de, en, fi, fr, it, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm)
+(locales: mhr, fr, myv, it, mrj, liv, fi, de, tr, en, sv, udm, mdf, sme)
 Command: recognize
-report word recognition rate (locales: de, en, fi, fr, it, liv, mdf, mhr, mrj, myv, sme, sv, tr, udm, la
+report word recognition rate (locales: mhr, fr, myv, it, mrj, liv, fi, de, tr, la, en, sv, udm, mdf, sme)
 Command: identify
 identify language (locales: zh-TW, fi, no, hr, ta, ar, fr, is, lv, eu, mt, bn, dk, uk, pa, ga, br, so, pt, cs, fr, gl, sr, zh-CN, mrj, el, it, ca, vi, tl, nl, bg, ko, liv, it, mk, oc, et, af, de, ru, yi, cy, en, udm, ur, mdf, myv, sme, ru, ht, ml, th, id, sq, sv, de, sv, tr, da, en, gu, he, es, kn, sk, es, hi, te, mr, an, sw, be, pt, nl, ja, ast, fi, ro, mhr, ne, lt, no, km, sl, fa, ms, hu, pl, la, tr)
+Command: hyphenate
+hyphenate (locales: nn, cop, in, sl, mhr, bg, sh, it, sr, uk, mn, mrj, da, liv, fi, hsb, es, eu, tr, hr, ia, ro, udm, mdf, pl, cy, pt, fr, ru, gl, myv, is, sk, ga, sa, zh, et, la, nb, cs, sv, el, ca, hu, nl, sme)
   --locale <value>         possible locales
-  --forms <value>          inclection forms for inflect/analyze
+  --forms <value>          inflection forms for inflect/analyze
   --segment                segment baseforms?
   --no-guess               Don't guess baseforms for unknown words?
   --no-segment-guessed     Don't guess segmentation information for guessed words (speeds up processing significantly)?
@@ -33,18 +35,26 @@ identify language (locales: zh-TW, fi, no, hr, ta, ar, fr, is, lv, eu, mt, bn, d
   --max-edit-distance <value>
                            Maximum edit distance for error-correcting unidentified words (default 0)?
   --no-pretty              Don't pretty print json?
-  <file>...                files to process (stdin if not given)
+  <file>...                files to process (stdin if not given. Will process directories recursively)
   --help                   prints this usage text
-
 ```
 
 ## Installation and running
 
-The LAS binary at https://github.com/jiemakel/las/releases is actually a Java JAR file, to which a tiny shell script has been prepended, running the JAR with an allocation of 4G of memory. Thus, on a UNIX system, after downloading the tool, it should be runnable itself. It may need to be set as executable first, though (e.g. `chmod 0755`). You can of course run the JAR also directly with other parameters yourself, e.g. `java -Xmx2G -jar las --help`.
+The LAS binaries at https://github.com/jiemakel/las/releases are actually Java JAR files, to which a tiny shell script has been prepended, running the JAR. Thus, on a UNIX system, after downloading the tool, it should be runnable itself. It may need to be set as executable first, though (e.g. `chmod 0755`). You can of course run the JAR also directly with other parameters yourself, e.g. `java -Xmx2G -jar las --help`.
+
+Recent versions of LAS build multiple binaries, where you can trade functionality for smaller file sizes.
+                                             
+The options are:
+ * las: complete package including all support for all languages, but weighing in at almost 600 megabytes
+ * las-fi: complete functionality for (only) Finnish, including edit distance fuzzy analysis for noisy (e.g. OCR errored) data as well as guessed word segmentation for words not in the lexicon (rarely needed)
+ * las-fi-small: basic functionality for (only) Finnish without fuzzy analysis or segmentation for guessed words, but a much smaller file size
+ * las-small: supports all languages, but provide only the basic functionality for Finnish
+ * las-non-fi: supports all languages apart from Finnish
 
 ### Optimal mode of running
 
-The memory allocation is necessary, as some of the transducers used by LAS are really quite huge (the biggest two some ~760 megabytes). This is also why the executable package is a whopping 400-900 megabytes (depending on release). This size also means that each time running the program, initial startup will take a significant time (which you can test by running `las --help`). However, after that, processing will be fluent. This means that to optimally use the tool, you should pass LAS as much data in a single run as possible. LAS should be able to efficiently process both large files, as well as a large number of them. Another option is also to not give LAS a filename, whereby the tool will enter a a streaming mode, processing input line by line.
+Some of the transducers used by LAS are really quite huge (the biggest two some ~760 megabytes). This is also why the executable package is a whopping 400-900 megabytes (depending on release). This size also means that each time running the program, initial startup will take a significant time (which you can test by running `las --help`). However, after that, processing will be fluent. This means that to optimally use the tool, you should pass LAS as much data in a single run as possible. LAS should be able to efficiently process both large files, as well as a large number of them. Another option is also to not give LAS a filename, whereby the tool will enter a a streaming mode, processing input line by line.
 
 When running on files, one should also select the appropriate `--process-by` mode. The default is to process by `file`, which is suitable for small files. However, if you have larger files, you should process either by `paragraph` (if you have such paragraphs, separated by two newlines) or by `line`, if you know sentences won't cross lines.
 
