@@ -56,7 +56,7 @@ object LASCommandLineTool extends LazyLogging {
 
   def main(args: Array[String]): Unit = {
     val parser = new scopt.OptionParser[Config]("las") {
-      head("las", "1.5.13")
+      head("las", "1.5.15")
       cmd("lemmatize") action { (_, c) =>
         c.copy(action = Action.Lemmatize)
       } text s"(locales: ${compoundlas.getSupportedBaseformLocales.asScala.mkString(", ")})"
