@@ -1,9 +1,9 @@
 lazy val commonSettings = Seq(
   organization := "fi.seco",
-  version := "1.5.14",
+  version := "1.5.15",
   scalaVersion := "2.12.4",
   libraryDependencies ++= Seq(
-    "fi.seco" % "lexicalanalysis" % "1.5.14",
+    "fi.seco" % "lexicalanalysis" % "1.5.15",
     "com.optimaize.languagedetector" % "language-detector" % "0.6",
     "com.github.scopt" %% "scopt" % "3.5.0",
     "com.typesafe.play" %% "play-json" % "2.6.0-M3",
