@@ -334,6 +334,16 @@ To this baseline, the functionality in LAS (or the modified Omorfi) adds:
   * `twiittasin` -> `tviitata`, (guessed, `twiittasin` for `--no-guess`)
   * `Leh>tim»ehen` -> `Lehtimies` for `--max-edit-distance 2`
   * `Helsingin` -> `Helsinki` (instead of the last name `Helsing`, based on Wikipedia frequency)
+  
+### Evaluation
+
+Below, LAS lemmatisation accuracy on Finnish is compared to the neural network version of the TurkuNLP parser (see https://universaldependencies.org/conll18/results-lemmas.html). 
+
+| Dataset | LAS | TurkuNLP-NN |
+|---------|-----|-------------|
+| FI-FTB | 93.44% | **97.02%** |
+| FI-PUD | 93.34% | **95.07%** |
+| FI-TDT | 92.00% | **95.32%** |
 
 ## Contributing
 
