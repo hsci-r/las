@@ -40,9 +40,9 @@ object LASCommandLineTool extends LazyLogging {
     val Inflect, Lemmatize, Analyze, Detect, Recognize, Hyphenate = Value
   }
 
-  implicit val actionRead: scopt.Read[Action.Value] = scopt.Read.reads(Action withName)
+  implicit val actionRead: scopt.Read[Action.Value] = scopt.Read.reads(Action.withName)
 
-  case class Config(action: Action.Action = null, locale: Seq[String] = Seq(), forms: java.util.List[String] = Collections.emptyList(), segmentBaseforms: Boolean = false, processBy: ProcessBy.ProcessBy = ProcessBy.Paragraph, guess: Boolean = true, segmentGuessed: Boolean = true, maxEditDistance: Int = 0, depth: Int = 1, pretty: Boolean = true, files: Seq[String] = Seq())
+  case class Config(action: Action.Action = null, locale: Seq[String] = Seq(), forms: java.util.List[String] = Collections.emptyList(), segmentBaseforms: Boolean = false, processBy: ProcessBy.ProcessBy = ProcessBy.Paragraph, guess: Boolean = true, segmentGuessed: Boolean = true, maxEditDistance: Int = 0, depth: Int = 1, pretty: Boolean = true, files: Seq[String] = Seq(), conll: Boolean = false, lemmatizeCompoundParts: Boolean = false, lowerCaseLemmas: Boolean = false)
 
   /** helper function to get a recursive stream of files for a directory */
   def getFileTree(f: File): Stream[File] =
@@ -56,7 +56,7 @@ object LASCommandLineTool extends LazyLogging {
 
   def main(args: Array[String]): Unit = {
     val parser = new scopt.OptionParser[Config]("las") {
-      head("las", "1.5.15")
+      head("las", "1.5.16")
       cmd("lemmatize") action { (_, c) =>
         c.copy(action = Action.Lemmatize)
       } text s"(locales: ${compoundlas.getSupportedBaseformLocales.asScala.mkString(", ")})"
@@ -96,6 +96,15 @@ object LASCommandLineTool extends LazyLogging {
       opt[Int]("depth") action { (x, c) =>
         c.copy(depth = x)
       } text "Analysis depth (0-2, 1=apply machine learned best analysis guessing, 2=include dependency analysis in output) (default 1)?"
+      opt[Unit]("lemmatize-compound-parts")  action { (x, c) =>
+        c.copy(lemmatizeCompoundParts = true)
+      } text "In lemmatize, lemmatize all parts of a compound word instead only the end?"
+      opt[Unit]("lowercase-lemmas")  action { (x, c) =>
+        c.copy(lowerCaseLemmas = true)
+      } text "In lemmatize, lowercase all lemmas?"
+      opt[Unit](name = "conll") action { (x, c) =>
+        c.copy(conll = true)
+      } text "Output lemmatization results in CONLL format"
       opt[Int]("max-edit-distance") action { (x, c) =>
         c.copy(maxEditDistance = x)
       } text "Maximum edit distance for error-correcting unidentified words (default 0)?"
@@ -149,7 +158,7 @@ object LASCommandLineTool extends LazyLogging {
             }
             var i = 0
             for (paragraph <- paragraphs) {
-              val lemma = lemmatize(paragraph, config.locale,config.segmentBaseforms,config.guess,config.maxEditDistance).getOrElse(paragraph)
+              val lemma = lemmatize(paragraph, config.locale,config.segmentBaseforms,config.guess,config.maxEditDistance, config.conll, config.lemmatizeCompoundParts, config.depth, config.lowerCaseLemmas).getOrElse(paragraph)
               writer.write(lemma)
               i += 1
               if (i!=paragraphs.length) {
@@ -157,12 +166,13 @@ object LASCommandLineTool extends LazyLogging {
                 if (config.processBy == ProcessBy.Paragraph) writer.write("\n")
               }
             }
+            if (config.conll) writer.write("\n")
             writer.close()
             logger.info("Wrote "+file.getPath+".lemmatized")
           } else {
             var text = StdIn.readLine()
             while (text != null) {
-              println(lemmatize(text, config.locale,config.segmentBaseforms,config.guess,config.maxEditDistance).getOrElse(text))
+              println(lemmatize(text, config.locale,config.segmentBaseforms,config.guess,config.maxEditDistance, config.conll, config.lemmatizeCompoundParts, config.depth, config.lowerCaseLemmas).getOrElse(text))
               text = StdIn.readLine()
             }
           }
@@ -285,13 +295,43 @@ object LASCommandLineTool extends LazyLogging {
     System.exit(0)
   }
 
-  def lemmatize(text: String, locales: Seq[String], segments : Boolean, guess: Boolean, maxEditDistance: Int): Option[String] = {
+  def lemmatize(text: String, locales: Seq[String], segments : Boolean, guess: Boolean, maxEditDistance: Int, conll: Boolean, lemmatizeCompoundParts: Boolean, depth: Int, lowercaseLemmas: Boolean): Option[String] = {
     (if (locales.length==1) Some(locales.head) else getBestLang(text, if (locales.isEmpty) compoundlas.getSupportedBaseformLocales.asScala.toSeq.map(_.toString) else locales)) match {
-      case Some(lang) => 
-        val baseform = compoundlas.baseform(text, new Locale(lang),segments,guess,maxEditDistance) 
-        if (locales.isEmpty) Some(Json.toJson(Map("locale" -> lang, "baseform" -> baseform)).toString())
-        else Some(baseform)
-      case None       => None
+      case Some(lang) =>
+        if (conll)
+          Some(
+            "# text = "+text.replaceAll("\n","\\n") + "\n" +
+            combinedlas.analyze(text, new Locale(lang), Collections.emptyList(), segments, guess, false, maxEditDistance, depth).asScala.filter(!_.getAnalysis.get(0).getGlobalTags.containsKey("WHITESPACE")).zipWithIndex.map(p =>
+              (p._2+1)+"\t"+p._1.getWord+"\t"+p._1.getAnalysis.asScala.find(_.getGlobalTags.containsKey("BEST_MATCH")).map(a => {
+                val parts = a.getParts.asScala
+                if (!lemmatizeCompoundParts) parts.dropRight(1).map(o => {
+                  val segments = o.getTags.get("SEGMENT")
+                  if (!segments.isEmpty)
+                    segments.asScala.filter(_ != "-0").map(_.replaceAllLiterally("»", "").replaceAllLiterally("{WB}","").replaceAllLiterally("{XB}","").replaceAllLiterally("{DB}","").replaceAllLiterally("{MB}","").replaceAllLiterally("{STUB}","").replaceAllLiterally("{hyph?}","")).mkString
+                  else o.getLemma
+                }).mkString + parts.last.getLemma else parts.map(_.getLemma).mkString
+              }).map(l => if (lowercaseLemmas) l.toLowerCase else l).get+"\t_\t_\t_\t"+p._2+"\t"+(if (p._2==0) "root" else "cc")+"\t_\t_"
+            ).mkString("\n")+"\n"
+          )
+        else {
+          var baseform = if (!lemmatizeCompoundParts) {
+            if (depth==1) compoundlas.baseform(text, new Locale(lang), segments, guess, maxEditDistance)
+            else combinedlas.baseform(text, new Locale(lang), segments, guess, maxEditDistance, depth)
+          } else combinedlas.analyze(text, new Locale(lang), Collections.emptyList(), segments, guess, false, maxEditDistance, depth).asScala.map(
+            _.getAnalysis.asScala.find(_.getGlobalTags.containsKey("BEST_MATCH")).map(a => {
+              val parts = a.getParts.asScala
+              parts.dropRight(1).map(o => {
+                val segments = o.getTags.get("SEGMENT")
+                if (!segments.isEmpty)
+                  segments.asScala.filter(_ != "-0").map(_.replaceAllLiterally("»", "").replaceAllLiterally("{WB}","").replaceAllLiterally("{XB}","").replaceAllLiterally("{DB}","").replaceAllLiterally("{MB}","").replaceAllLiterally("{STUB}","").replaceAllLiterally("{hyph?}","")).mkString
+                else o.getLemma
+              }).mkString + parts.last.getLemma})
+          ).mkString
+          if (lowercaseLemmas) baseform = baseform.toLowerCase
+          if (locales.isEmpty) Some(Json.toJson(Map("locale" -> lang, "baseform" -> baseform)).toString())
+          else Some(baseform)
+        }
+      case None => None
     }
   }
 
@@ -336,7 +376,7 @@ object LASCommandLineTool extends LazyLogging {
 
   def analyze(text: String, locales: Seq[String],forms:java.util.List[String], segments:Boolean, guess:Boolean, segmentGuessed:Boolean, maxEditDistance: Int, depth: Int, pretty:Boolean): Option[String] = {
     (if (locales.length==1) Some(locales.head) else getBestLang(text, if (locales.isEmpty) combinedlas.getSupportedAnalyzeLocales.asScala.toSeq.map(_.toString) else locales)) match {
-      case Some(lang) => 
+      case Some(lang) =>
         val analysis = Json.toJson(combinedlas.analyze(text, new Locale(lang),forms,segments,guess,segmentGuessed,maxEditDistance, depth).asScala.toList)
         if (pretty) {
           if (locales.isEmpty) Some(Json.prettyPrint(Json.toJson(Map("locale" -> Json.toJson(lang), "analysis" -> analysis))))

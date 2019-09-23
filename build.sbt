@@ -1,6 +1,6 @@
 lazy val commonSettings = Seq(
   organization := "fi.seco",
-  version := "1.5.15",
+  version := "1.5.16",
   scalaVersion := "2.12.4",
   libraryDependencies ++= Seq(
     "fi.seco" % "lexicalanalysis" % "1.5.15",
